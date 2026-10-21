@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""Generate local secrets and runtime config; never alters existing passwords."""
+from pathlib import Path
+import json,secrets,sys
+from urllib.parse import urlparse
+root=Path(__file__).resolve().parent.parent
+p=root/'.env'
+if not p.exists():
+ p.write_text((root/'.env.example').read_text())
+ p.chmod(0o600)
+values={}
+for line in p.read_text().splitlines():
+ if line.strip() and not line.startswith('#') and '=' in line:
+  k,v=line.split('=',1);values[k]=v
+for k,v in values.items():
+ if v=='GENERATE':values[k]=secrets.token_hex(32)
+p.write_text('\n'.join(k+'='+v for k,v in values.items())+'\n')
+g=root/'generated';g.mkdir(exist_ok=True);(g/'n8n').mkdir(exist_ok=True)
+mode='dev' if '--dev' in sys.argv else 'prod'
+origin=values['PUBLIC_ORIGIN'];auth=values['AUTH_ORIGIN'];host=urlparse(origin).hostname;authhost=urlparse(auth).hostname
+if not host or not authhost or host==authhost:raise SystemExit('PUBLIC_ORIGIN and AUTH_ORIGIN need distinct hosts')
+def routes(dev=False):
+ core='host.docker.internal:4000' if dev else 'core:4000';web='host.docker.internal:5173' if dev else 'web:80'
+ def upstream(target):return {'type':'roundrobin','nodes':{target:1}}
+ limit={'limit-count':{'count':120,'time_window':60,'rejected_code':429,'key_type':'var','key':'remote_addr','policy':'local'}}
+ secure={**limit,'forward-auth':{'uri':'http://'+core+'/internal/gateway','request_headers':['Authorization']},'proxy-rewrite':{'headers':{'remove':['x-hasura-admin-secret','x-hasura-access-key','x-hasura-role','x-hasura-user-id','x-hasura-tenant-id','x-hasura-app-role']}}}
+ return {'routes':[
+ {'id':'identity','host':authhost,'uri':'/*','priority':100,'plugins':{
+    **limit,
+    'proxy-rewrite':{
+        'host':urlparse(auth).netloc,
+        'headers':{'set':{
+            'X-Forwarded-Host':urlparse(auth).netloc,
+            'X-Forwarded-Proto':urlparse(auth).scheme,
+            'X-Forwarded-Port':str(
+                urlparse(auth).port or
+                (443 if urlparse(auth).scheme == 'https' else 80)
+            )
+        }}
+    }
+},'upstream':upstream('logto:3001')},
+ {'id':'core','host':host,'uri':'/api/*','priority':90,'plugins':secure,'upstream':upstream(core)},
+ {'id':'graphql','host':host,'uri':'/v1/graphql','methods':['POST'],'priority':90,'plugins':secure,'upstream':upstream('hasura:8080')},
+ {'id':'websocket','host':host,'uri':'/connection/websocket','priority':90,'enable_websocket':True,'plugins':limit,'upstream':upstream('centrifugo:8000')},
+ {'id':'web','host':host,'uri':'/*','priority':1,'enable_websocket':True,'upstream':upstream(web)}]}
+# JSON is valid YAML; APISIX standalone requires the #END sentinel.
+for dev in [False,True]: (g/('apisix.dev.yaml' if dev else 'apisix.yaml')).write_text(json.dumps(routes(dev),indent=2)+'\n#END\n')
+(g/'config.json').write_text(json.dumps({'endpoint':auth,'appId':values['LOGTO_APP_ID'],'resource':values['LOGTO_RESOURCE'],'origin':origin}))
+(root.parent/'web'/'public').mkdir(exist_ok=True)
+(root.parent/'web'/'public'/'config.json').write_text((g/'config.json').read_text())
+(g/'centrifugo.json').write_text(json.dumps({'client':{'allowed_origins':[origin]},'channel':{'namespaces':[{'name':'personal'}]},'admin':{'enabled':False}}))
+workflow=(root/'n8n/workflows/notifications.template.json').read_text().replace('__WORKFLOW_PATH__',values['WORKFLOW_PATH']).replace('__CORE_URL__','http://host.docker.internal:4000' if mode=='dev' else 'http://core:4000')
+(g/'n8n/notifications.json').write_text(workflow)
+e={
+'DATABASE_URL':'postgres://sharebase:'+values['CORE_DB_PASSWORD']+'@127.0.0.1:5432/sharebase',
+'LOGTO_ISSUER':auth+'/oidc','LOGTO_JWKS_URL':'http://127.0.0.1:3001/oidc/jwks','LOGTO_RESOURCE':values['LOGTO_RESOURCE'],
+'INTERNAL_SECRET':values['INTERNAL_SECRET'],'CENTRIFUGO_SECRET':values['CENTRIFUGO_SECRET'],'CENTRIFUGO_API_KEY':values['CENTRIFUGO_API_KEY'],
+'CENTRIFUGO_URL':'http://127.0.0.1:8000','N8N_WEBHOOK_URL':'http://127.0.0.1:5678/webhook/'+values['WORKFLOW_PATH'],
+'S3_ENDPOINT':'http://127.0.0.1:9000','S3_ACCESS_KEY':values['MINIO_ROOT_USER'],'S3_SECRET_KEY':values['MINIO_ROOT_PASSWORD'],'S3_BUCKET':'sharebase',
+'HASURA_URL':'http://127.0.0.1:8081','HASURA_ADMIN_SECRET':values['HASURA_ADMIN_SECRET'],'MIGRATIONS_DIR':'../db/migrations','METADATA_FILE':'../hasura/metadata.json'}
+(root/'core/.env').write_text('\n'.join(k+'='+v for k,v in e.items())+'\n');(root/'core/.env').chmod(0o600)
+print('Configuration generated for',mode,'— set LOGTO_APP_ID after creating your SPA application, then run this command again.')

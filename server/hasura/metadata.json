@@ -1,0 +1,670 @@
+{
+  "version": 3,
+  "sources": [
+    {
+      "name": "default",
+      "kind": "postgres",
+      "configuration": {
+        "connection_info": {
+          "database_url": {
+            "from_env": "HASURA_DATA_DATABASE_URL"
+          },
+          "isolation_level": "read-committed",
+          "use_prepared_statements": true
+        }
+      },
+      "tables": [
+        {
+          "table": {
+            "schema": "public",
+            "name": "organizations"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "name",
+                  "created_at"
+                ],
+                "filter": {
+                  "id": {
+                    "_eq": "X-Hasura-Tenant-Id"
+                  }
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "memberships"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "tenant_id",
+                  "user_id",
+                  "role"
+                ],
+                "filter": {
+                  "tenant_id": {
+                    "_eq": "X-Hasura-Tenant-Id"
+                  }
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "apps"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "tenant_id",
+                  "name",
+                  "description",
+                  "created_at"
+                ],
+                "filter": {
+                  "tenant_id": {
+                    "_eq": "X-Hasura-Tenant-Id"
+                  }
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "collections"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "tenant_id",
+                  "app_id",
+                  "name",
+                  "description",
+                  "workflow_enabled",
+                  "reviewer_role",
+                  "created_at"
+                ],
+                "filter": {
+                  "tenant_id": {
+                    "_eq": "X-Hasura-Tenant-Id"
+                  }
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "fields"
+          },
+          "array_relationships": [
+            {
+              "name": "permissions",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "field_permissions"
+                  },
+                  "column_mapping": {
+                    "id": "field_id",
+                    "tenant_id": "tenant_id"
+                  }
+                }
+              }
+            }
+          ],
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "tenant_id",
+                  "collection_id",
+                  "key",
+                  "label",
+                  "type",
+                  "required",
+                  "options",
+                  "position"
+                ],
+                "filter": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "permissions": {
+                        "role": {
+                          "_eq": "X-Hasura-App-Role"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "field_permissions"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "tenant_id",
+                  "field_id",
+                  "role",
+                  "can_write"
+                ],
+                "filter": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "role": {
+                        "_eq": "X-Hasura-App-Role"
+                      }
+                    }
+                  ]
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "records"
+          },
+          "array_relationships": [
+            {
+              "name": "values",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "record_values"
+                  },
+                  "column_mapping": {
+                    "id": "record_id",
+                    "tenant_id": "tenant_id"
+                  }
+                }
+              }
+            },
+            {
+              "name": "comments",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "comments"
+                  },
+                  "column_mapping": {
+                    "id": "record_id",
+                    "tenant_id": "tenant_id"
+                  }
+                }
+              }
+            }
+          ],
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "tenant_id",
+                  "collection_id",
+                  "title",
+                  "status",
+                  "created_by",
+                  "version",
+                  "created_at",
+                  "updated_at"
+                ],
+                "filter": {
+                  "tenant_id": {
+                    "_eq": "X-Hasura-Tenant-Id"
+                  }
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "record_values"
+          },
+          "object_relationships": [
+            {
+              "name": "field",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "fields"
+                  },
+                  "column_mapping": {
+                    "field_id": "id",
+                    "tenant_id": "tenant_id"
+                  }
+                }
+              }
+            }
+          ],
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "tenant_id",
+                  "collection_id",
+                  "record_id",
+                  "field_id",
+                  "value"
+                ],
+                "filter": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "field": {
+                        "permissions": {
+                          "role": {
+                            "_eq": "X-Hasura-App-Role"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "approvals"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "tenant_id",
+                  "record_id",
+                  "requested_by",
+                  "reviewer_role",
+                  "status",
+                  "decided_by",
+                  "comment",
+                  "created_at",
+                  "decided_at"
+                ],
+                "filter": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "_or": [
+                        {
+                          "requested_by": {
+                            "_eq": "X-Hasura-User-Id"
+                          }
+                        },
+                        {
+                          "reviewer_role": {
+                            "_eq": "X-Hasura-App-Role"
+                          }
+                        },
+                        {
+                          "_exists": {
+                            "_table": {
+                              "schema": "public",
+                              "name": "memberships"
+                            },
+                            "_where": {
+                              "tenant_id": {
+                                "_eq": "X-Hasura-Tenant-Id"
+                              },
+                              "user_id": {
+                                "_eq": "X-Hasura-User-Id"
+                              },
+                              "role": {
+                                "_eq": "owner"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "files"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "tenant_id",
+                  "record_id",
+                  "name",
+                  "mime",
+                  "size",
+                  "uploaded_by",
+                  "created_at"
+                ],
+                "filter": {
+                  "tenant_id": {
+                    "_eq": "X-Hasura-Tenant-Id"
+                  }
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "notifications"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "tenant_id",
+                  "user_id",
+                  "event_id",
+                  "message",
+                  "read_at",
+                  "created_at"
+                ],
+                "filter": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "user_id": {
+                        "_eq": "X-Hasura-User-Id"
+                      }
+                    }
+                  ]
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "comments"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": [
+                  "id",
+                  "tenant_id",
+                  "record_id",
+                  "author",
+                  "body",
+                  "created_at"
+                ],
+                "filter": {
+                  "tenant_id": {
+                    "_eq": "X-Hasura-Tenant-Id"
+                  }
+                },
+                "limit": 100,
+                "allow_aggregations": true
+              }
+            }
+          ],
+          "insert_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "check": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "author": {
+                        "_eq": "X-Hasura-User-Id"
+                      }
+                    },
+                    {
+                      "_exists": {
+                        "_table": {
+                          "schema": "public",
+                          "name": "memberships"
+                        },
+                        "_where": {
+                          "tenant_id": {
+                            "_eq": "X-Hasura-Tenant-Id"
+                          },
+                          "user_id": {
+                            "_eq": "X-Hasura-User-Id"
+                          },
+                          "role": {
+                            "_neq": "viewer"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "columns": [
+                  "record_id",
+                  "body"
+                ],
+                "set": {
+                  "tenant_id": "X-Hasura-Tenant-Id",
+                  "author": "X-Hasura-User-Id"
+                }
+              }
+            }
+          ],
+          "update_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "filter": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "author": {
+                        "_eq": "X-Hasura-User-Id"
+                      }
+                    },
+                    {
+                      "_exists": {
+                        "_table": {
+                          "schema": "public",
+                          "name": "memberships"
+                        },
+                        "_where": {
+                          "tenant_id": {
+                            "_eq": "X-Hasura-Tenant-Id"
+                          },
+                          "user_id": {
+                            "_eq": "X-Hasura-User-Id"
+                          },
+                          "role": {
+                            "_neq": "viewer"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "check": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "author": {
+                        "_eq": "X-Hasura-User-Id"
+                      }
+                    },
+                    {
+                      "_exists": {
+                        "_table": {
+                          "schema": "public",
+                          "name": "memberships"
+                        },
+                        "_where": {
+                          "tenant_id": {
+                            "_eq": "X-Hasura-Tenant-Id"
+                          },
+                          "user_id": {
+                            "_eq": "X-Hasura-User-Id"
+                          },
+                          "role": {
+                            "_neq": "viewer"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "columns": [
+                  "body"
+                ]
+              }
+            }
+          ],
+          "delete_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "filter": {
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "author": {
+                        "_eq": "X-Hasura-User-Id"
+                      }
+                    },
+                    {
+                      "_exists": {
+                        "_table": {
+                          "schema": "public",
+                          "name": "memberships"
+                        },
+                        "_where": {
+                          "tenant_id": {
+                            "_eq": "X-Hasura-Tenant-Id"
+                          },
+                          "user_id": {
+                            "_eq": "X-Hasura-User-Id"
+                          },
+                          "role": {
+                            "_neq": "viewer"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

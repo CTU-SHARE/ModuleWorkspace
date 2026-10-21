@@ -1,0 +1,13 @@
+services:
+  logto:
+    networks:
+      internal: {}
+      local_access: {}
+    ports: !override
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3002"
+
+networks:
+  local_access:
+    driver: bridge
+    internal: false

@@ -1,0 +1,6 @@
+# Maintenance only; never publish these ports on 0.0.0.0.
+services:
+  logto:
+    ports: ['127.0.0.1:3002:3002']
+  n8n:
+    ports: ['127.0.0.1:5678:5678']
