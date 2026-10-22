@@ -1,7 +1,41 @@
 {
- "id":"ShareBaseNotify1","name":"ShareBase · Durable event notifications","active":false,
- "nodes":[
- {"id":"webhook","name":"Event","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[0,0],"webhookId":"sharebase-events","parameters":{"httpMethod":"POST","path":"__WORKFLOW_PATH__","responseMode":"lastNode","options":{}}},
- {"id":"deliver","name":"Deliver","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[260,0],"parameters":{"method":"POST","url":"=__CORE_URL__/internal/events/{{$json.body.event_id}}/deliver","sendHeaders":true,"headerParameters":{"parameters":[{"name":"X-Internal-Secret","value":"={{$json.headers['x-internal-secret']}}"}]},"options":{"timeout":30000}}}
- ],"connections":{"Event":{"main":[[{"node":"Deliver","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"}
+  "id": "ShareBaseNotify1",
+  "name": "ShareBase · Durable event notifications",
+  "active": false,
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "sharebase-events",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "__WORKFLOW_PATH__",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "deliver",
+      "name": "Deliver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "=__CORE_URL__/internal/events/{{$json.body.event_id}}/deliver",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Secret", "value": "={{$json.headers['x-internal-secret']}}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      }
+    }
+  ],
+  "connections": { "Event": { "main": [[{ "node": "Deliver", "type": "main", "index": 0 }]] } },
+  "settings": { "executionOrder": "v1" }
 }

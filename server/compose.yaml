@@ -44,7 +44,7 @@ services:
     volumes: [./db/migrations:/migrations:ro]
     networks: [internal]
     depends_on:
-      db: {condition: service_healthy}
+      db: { condition: service_healthy }
   logto-init:
     image: ${LOGTO_IMAGE}
     entrypoint: [sh, -c]
@@ -53,7 +53,7 @@ services:
       DB_URL: postgres://logto:${LOGTO_DB_PASSWORD}@db:5432/logto
     networks: [internal]
     depends_on:
-      db: {condition: service_healthy}
+      db: { condition: service_healthy }
   logto:
     image: ${LOGTO_IMAGE}
     entrypoint: [sh, -c]
@@ -65,14 +65,14 @@ services:
       TRUST_PROXY_HEADER: '1'
     networks: [internal]
     depends_on:
-      logto-init: {condition: service_completed_successfully}
+      logto-init: { condition: service_completed_successfully }
     restart: unless-stopped
   core:
     build: ./core
     environment: *core-env
     networks: [internal]
     depends_on:
-      migrate: {condition: service_completed_successfully}
+      migrate: { condition: service_completed_successfully }
     restart: unless-stopped
   worker:
     build: ./core
@@ -80,7 +80,7 @@ services:
     environment: *core-env
     networks: [internal]
     depends_on:
-      migrate: {condition: service_completed_successfully}
+      migrate: { condition: service_completed_successfully }
     restart: unless-stopped
   hasura:
     image: hasura/graphql-engine:v2.48.0
@@ -97,7 +97,7 @@ services:
       HASURA_GRAPHQL_WS_READ_COOKIE: 'false'
     networks: [internal]
     depends_on:
-      migrate: {condition: service_completed_successfully}
+      migrate: { condition: service_completed_successfully }
     restart: unless-stopped
   metadata:
     build: ./core
@@ -146,7 +146,7 @@ services:
     volumes: [n8n-data:/home/node/.n8n, ./generated/n8n:/imports:ro]
     networks: [internal]
     depends_on:
-      db: {condition: service_healthy}
+      db: { condition: service_healthy }
     restart: unless-stopped
   centrifugo:
     image: centrifugo/centrifugo:v6.1.0
@@ -178,7 +178,7 @@ services:
     depends_on: [core, web, logto, hasura, centrifugo]
     restart: unless-stopped
 networks:
-  internal: {internal: true}
+  internal: { internal: true }
   edge: {}
 volumes:
   db-data:

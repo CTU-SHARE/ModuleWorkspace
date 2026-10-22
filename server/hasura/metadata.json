@@ -23,11 +23,7 @@
             {
               "role": "member",
               "permission": {
-                "columns": [
-                  "id",
-                  "name",
-                  "created_at"
-                ],
+                "columns": ["id", "name", "created_at"],
                 "filter": {
                   "id": {
                     "_eq": "X-Hasura-Tenant-Id"
@@ -48,11 +44,7 @@
             {
               "role": "member",
               "permission": {
-                "columns": [
-                  "tenant_id",
-                  "user_id",
-                  "role"
-                ],
+                "columns": ["tenant_id", "user_id", "role"],
                 "filter": {
                   "tenant_id": {
                     "_eq": "X-Hasura-Tenant-Id"
@@ -73,13 +65,7 @@
             {
               "role": "member",
               "permission": {
-                "columns": [
-                  "id",
-                  "tenant_id",
-                  "name",
-                  "description",
-                  "created_at"
-                ],
+                "columns": ["id", "tenant_id", "name", "description", "created_at"],
                 "filter": {
                   "tenant_id": {
                     "_eq": "X-Hasura-Tenant-Id"
@@ -189,12 +175,7 @@
             {
               "role": "member",
               "permission": {
-                "columns": [
-                  "tenant_id",
-                  "field_id",
-                  "role",
-                  "can_write"
-                ],
+                "columns": ["tenant_id", "field_id", "role", "can_write"],
                 "filter": {
                   "_and": [
                     {
@@ -304,13 +285,7 @@
             {
               "role": "member",
               "permission": {
-                "columns": [
-                  "tenant_id",
-                  "collection_id",
-                  "record_id",
-                  "field_id",
-                  "value"
-                ],
+                "columns": ["tenant_id", "collection_id", "record_id", "field_id", "value"],
                 "filter": {
                   "_and": [
                     {
@@ -481,14 +456,7 @@
             {
               "role": "member",
               "permission": {
-                "columns": [
-                  "id",
-                  "tenant_id",
-                  "record_id",
-                  "author",
-                  "body",
-                  "created_at"
-                ],
+                "columns": ["id", "tenant_id", "record_id", "author", "body", "created_at"],
                 "filter": {
                   "tenant_id": {
                     "_eq": "X-Hasura-Tenant-Id"
@@ -536,10 +504,7 @@
                     }
                   ]
                 },
-                "columns": [
-                  "record_id",
-                  "body"
-                ],
+                "columns": ["record_id", "body"],
                 "set": {
                   "tenant_id": "X-Hasura-Tenant-Id",
                   "author": "X-Hasura-User-Id"
@@ -617,9 +582,7 @@
                     }
                   ]
                 },
-                "columns": [
-                  "body"
-                ]
+                "columns": ["body"]
               }
             }
           ],

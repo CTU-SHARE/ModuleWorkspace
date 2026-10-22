@@ -20,36 +20,36 @@ ShareBase là nền tảng quản lý công việc và hồ sơ lấy cảm hứ
 
 Tầng 2 là frontend React + Vite. Tầng 1 là cụm dịch vụ headless có APISIX, Logto, PostgreSQL, Hasura, Express TypeScript, MinIO, n8n và Centrifugo. Người dùng cuối thao tác hoàn toàn qua ShareBase. Console quản trị hạ tầng chỉ dành cho người vận hành, không công bố qua gateway.
 
-| Thành phần | Nhiệm vụ |
-|---|---|
-| APISIX | Entry point, routing theo host/path, xác thực biên, rate limit |
-| Logto | SSO/OIDC, access token, quản lý tài khoản |
-| Express Core | Quyền nghiệp vụ, schema động, phê duyệt, tệp, callback nội bộ |
-| PostgreSQL | Tenant, metadata ứng dụng, hồ sơ, workflow state, outbox |
-| Hasura | GraphQL có row/field permissions; CRUD trao đổi hồ sơ |
-| MinIO | Bucket private, versioning, lưu tệp |
-| n8n | Điều phối giao vận sự kiện và thông báo bất đồng bộ |
-| Centrifugo | Thông báo refresh qua WebSocket với token ngắn hạn |
+| Thành phần   | Nhiệm vụ                                                       |
+| ------------ | -------------------------------------------------------------- |
+| APISIX       | Entry point, routing theo host/path, xác thực biên, rate limit |
+| Logto        | SSO/OIDC, access token, quản lý tài khoản                      |
+| Express Core | Quyền nghiệp vụ, schema động, phê duyệt, tệp, callback nội bộ  |
+| PostgreSQL   | Tenant, metadata ứng dụng, hồ sơ, workflow state, outbox       |
+| Hasura       | GraphQL có row/field permissions; CRUD trao đổi hồ sơ          |
+| MinIO        | Bucket private, versioning, lưu tệp                            |
+| n8n          | Điều phối giao vận sự kiện và thông báo bất đồng bộ            |
+| Centrifugo   | Thông báo refresh qua WebSocket với token ngắn hạn             |
 
 Mạng `internal` đặt `internal: true`. Chỉ gateway ở thêm mạng `edge`; mặc định production Compose chỉ publish gateway ở loopback. Dev override mở các cổng cần thiết ở loopback để Express trên host kết nối.
 
 ## Cấu trúc dự án
 
-| Đường dẫn | Nội dung |
-|---|---|
-| `web/` | React TypeScript, UI, Dockerfile, nginx |
-| `server/core/` | Express, worker, migration runner, Hasura metadata loader |
-| `server/db/` | Khởi tạo database/user và SQL migrations |
-| `server/apisix/` | APISIX standalone config |
-| `server/logto/` | Cấu hình và hướng dẫn SSO |
-| `server/hasura/` | Metadata, relationships, permissions |
-| `server/n8n/` | Workflow template, cách vận hành |
-| `server/minio/` | Private bucket initializer |
-| `server/centrifugo/` | Chính sách realtime |
-| `server/scripts/` | Sinh config, bootstrap, backup |
-| `server/compose.yaml` | Stack container đầy đủ |
-| `server/compose.dev.yaml` | Chạy Express và Vite trên host |
-| `server/compose.admin.yaml` | Console loopback trong thời gian bảo trì |
+| Đường dẫn                   | Nội dung                                                  |
+| --------------------------- | --------------------------------------------------------- |
+| `web/`                      | React TypeScript, UI, Dockerfile, nginx                   |
+| `server/core/`              | Express, worker, migration runner, Hasura metadata loader |
+| `server/db/`                | Khởi tạo database/user và SQL migrations                  |
+| `server/apisix/`            | APISIX standalone config                                  |
+| `server/logto/`             | Cấu hình và hướng dẫn SSO                                 |
+| `server/hasura/`            | Metadata, relationships, permissions                      |
+| `server/n8n/`               | Workflow template, cách vận hành                          |
+| `server/minio/`             | Private bucket initializer                                |
+| `server/centrifugo/`        | Chính sách realtime                                       |
+| `server/scripts/`           | Sinh config, bootstrap, backup                            |
+| `server/compose.yaml`       | Stack container đầy đủ                                    |
+| `server/compose.dev.yaml`   | Chạy Express và Vite trên host                            |
+| `server/compose.admin.yaml` | Console loopback trong thời gian bảo trì                  |
 
 ## Yêu cầu máy
 
@@ -168,12 +168,12 @@ Có thể tự thiết kế ứng dụng khác thay vì dùng mẫu. Chủ sở 
 
 ## Quyền và dữ liệu
 
-| Role | Quyền |
-|---|---|
-| owner | Quản trị tổ chức, quản lý admin, thiết kế ứng dụng; được duyệt nhưng không tự duyệt |
-| admin | Thiết kế ứng dụng/biểu mẫu, quản lý editor/viewer, sửa hồ sơ trong tenant; duyệt khi vai trò quy trình là admin |
-| editor | Tạo hồ sơ, sửa/gửi hồ sơ của mình; duyệt hồ sơ người khác khi vai trò quy trình là editor |
-| viewer | Đọc hồ sơ và những trường được cấp quyền, tải tệp; không thay đổi dữ liệu |
+| Role   | Quyền                                                                                                           |
+| ------ | --------------------------------------------------------------------------------------------------------------- |
+| owner  | Quản trị tổ chức, quản lý admin, thiết kế ứng dụng; được duyệt nhưng không tự duyệt                             |
+| admin  | Thiết kế ứng dụng/biểu mẫu, quản lý editor/viewer, sửa hồ sơ trong tenant; duyệt khi vai trò quy trình là admin |
+| editor | Tạo hồ sơ, sửa/gửi hồ sơ của mình; duyệt hồ sơ người khác khi vai trò quy trình là editor                       |
+| viewer | Đọc hồ sơ và những trường được cấp quyền, tải tệp; không thay đổi dữ liệu                                       |
 
 Quyền hiện tại ở cấp **tenant + role + field**, chưa có custom role/department hoặc hạn chế từng collection. Tất cả thành viên tenant thấy tiêu đề, trạng thái hồ sơ và các tệp trong tenant; không đưa thông tin chỉ-admin vào tiêu đề/tệp nếu muốn ẩn bằng field permissions.
 
@@ -185,30 +185,30 @@ Audit ứng dụng ghi trong transaction của Core. CRUD comments qua Hasura kh
 
 API nghiệp vụ cần `Authorization: Bearer <Logto access token>` và `X-Tenant-Id: <organization UUID>`. `/api/me` và tạo tổ chức không cần tenant đã tồn tại.
 
-| Endpoint | Mục đích |
-|---|---|
-| GET `/api/me` | Subject và tổ chức hiện có |
-| POST `/api/organizations` | Tạo tenant và owner |
-| GET/PUT/DELETE `/api/members[/subject]` | Danh sách, gán role, gỡ thành viên |
-| GET/POST `/api/apps` | Ứng dụng |
-| POST `/api/templates/office` | Tạo mẫu Văn phòng số |
-| GET/POST `/api/collections` | Bảng dữ liệu |
-| PATCH `/api/collections/:id` | Tên và cấu hình workflow |
-| GET/POST `/api/collections/:id/fields` | Trường và quyền |
-| GET/POST `/api/collections/:id/records` | Danh sách và tạo hồ sơ |
-| GET/PATCH/DELETE `/api/records/:id` | Chi tiết, sửa có version, xóa nháp |
-| POST `/api/records/:id/submit` | Gửi duyệt |
-| GET `/api/approvals` | Yêu cầu của mình / cần mình duyệt |
-| POST `/api/approvals/:id/decide` | Quyết định và nhận xét |
-| GET/POST `/api/records/:id/files` | Tệp đính kèm |
-| GET `/api/files/:id/download` | Download có kiểm tra tenant |
-| GET `/api/dashboard` | Thống kê |
-| GET `/api/notifications` | Thông báo cá nhân |
-| POST `/api/notifications/read` | Đánh dấu đã đọc |
-| GET `/api/realtime/token` | JWT Centrifugo ngắn hạn |
-| GET `/api/audit`, GET `/api/operations` | Nhật ký và outbox |
-| POST `/api/operations/:id/retry` | Lên lịch lại sự kiện |
-| POST `/v1/graphql` | Hasura đọc dữ liệu phân quyền và CRUD comments |
+| Endpoint                                | Mục đích                                       |
+| --------------------------------------- | ---------------------------------------------- |
+| GET `/api/me`                           | Subject và tổ chức hiện có                     |
+| POST `/api/organizations`               | Tạo tenant và owner                            |
+| GET/PUT/DELETE `/api/members[/subject]` | Danh sách, gán role, gỡ thành viên             |
+| GET/POST `/api/apps`                    | Ứng dụng                                       |
+| POST `/api/templates/office`            | Tạo mẫu Văn phòng số                           |
+| GET/POST `/api/collections`             | Bảng dữ liệu                                   |
+| PATCH `/api/collections/:id`            | Tên và cấu hình workflow                       |
+| GET/POST `/api/collections/:id/fields`  | Trường và quyền                                |
+| GET/POST `/api/collections/:id/records` | Danh sách và tạo hồ sơ                         |
+| GET/PATCH/DELETE `/api/records/:id`     | Chi tiết, sửa có version, xóa nháp             |
+| POST `/api/records/:id/submit`          | Gửi duyệt                                      |
+| GET `/api/approvals`                    | Yêu cầu của mình / cần mình duyệt              |
+| POST `/api/approvals/:id/decide`        | Quyết định và nhận xét                         |
+| GET/POST `/api/records/:id/files`       | Tệp đính kèm                                   |
+| GET `/api/files/:id/download`           | Download có kiểm tra tenant                    |
+| GET `/api/dashboard`                    | Thống kê                                       |
+| GET `/api/notifications`                | Thông báo cá nhân                              |
+| POST `/api/notifications/read`          | Đánh dấu đã đọc                                |
+| GET `/api/realtime/token`               | JWT Centrifugo ngắn hạn                        |
+| GET `/api/audit`, GET `/api/operations` | Nhật ký và outbox                              |
+| POST `/api/operations/:id/retry`        | Lên lịch lại sự kiện                           |
+| POST `/v1/graphql`                      | Hasura đọc dữ liệu phân quyền và CRUD comments |
 
 Ví dụ tạo hồ sơ: `{"title":"Mua máy chiếu","data":{"item":"Máy chiếu","amount":15000000,"reason":"Phòng họp"}}`. Khi sửa, thêm `version` lấy từ lần đọc gần nhất. Server trả 409 khi version đã cũ.
 

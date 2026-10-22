@@ -6,13 +6,13 @@ Migration được quản lý bằng `schema_migrations`, checksum SHA-256 và a
 
 Mô hình nghiệp vụ:
 
-| Nhóm | Bảng | Vai trò |
-|---|---|---|
-| Định danh nghiệp vụ | organizations, users, memberships | Tenant, subject Logto, role theo tenant |
-| Builder | apps, collections, fields, field_permissions | Ứng dụng, bảng, schema động, quyền trường |
-| Hồ sơ | records, record_values, files, comments | Trạng thái, giá trị có kiểu, tệp, trao đổi |
-| Quy trình | approvals | Yêu cầu duyệt, vai trò duyệt được chụp tại thời điểm gửi, quyết định |
-| Vận hành | audit_logs, outbox, notifications | Audit, giao vận bền vững, thông báo cá nhân |
+| Nhóm                | Bảng                                         | Vai trò                                                              |
+| ------------------- | -------------------------------------------- | -------------------------------------------------------------------- |
+| Định danh nghiệp vụ | organizations, users, memberships            | Tenant, subject Logto, role theo tenant                              |
+| Builder             | apps, collections, fields, field_permissions | Ứng dụng, bảng, schema động, quyền trường                            |
+| Hồ sơ               | records, record_values, files, comments      | Trạng thái, giá trị có kiểu, tệp, trao đổi                           |
+| Quy trình           | approvals                                    | Yêu cầu duyệt, vai trò duyệt được chụp tại thời điểm gửi, quyết định |
+| Vận hành            | audit_logs, outbox, notifications            | Audit, giao vận bền vững, thông báo cá nhân                          |
 
 Khóa ngoại ghép `(tenant_id, id)` và `(tenant_id, collection_id, id)` ngăn liên kết hồ sơ/trường/tệp sang tenant hoặc collection khác. Các index phục vụ danh sách theo tenant, collection, thời gian và outbox chưa giao.
 

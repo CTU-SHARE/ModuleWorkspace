@@ -12,11 +12,17 @@ Ví dụ đọc:
 
 ```graphql
 query Records($collection: uuid!) {
-  records(where: {collection_id: {_eq: $collection}}, limit: 30) {
+  records(where: { collection_id: { _eq: $collection } }, limit: 30) {
     id
     title
     status
-    values { value field { key label } }
+    values {
+      value
+      field {
+        key
+        label
+      }
+    }
   }
 }
 ```
