@@ -1,3 +1,4 @@
+import './Forms';
 import './Records';
 import './DefaultOptions';
 import './ValidationOptions';

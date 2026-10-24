@@ -1,3 +1,4 @@
+import './builder/forms.js';
 import './builder/configuration.js';
 import './builder/records.js';
 import './builder/defaults.js';
