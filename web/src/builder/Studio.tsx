@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AppList } from './AppList';
 import { AsyncForm } from '../components/AsyncForm';
 import type { API } from '../useApi';
 import { appPanels, appTools, collectionPanels, type Row } from './registry';
@@ -51,7 +52,7 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
           refresh={refresh}
         />
       ))}
-      {/* APPLICATION_LIST */}
+      <AppList api={api} tick={tick} select={setApp} />
       {app && (
         <>
           <h3>{app.name}</h3>
