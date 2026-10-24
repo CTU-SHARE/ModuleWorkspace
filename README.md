@@ -1,37 +1,37 @@
 # ShareBase
 
-ShareBase là nền tảng quản lý công việc và hồ sơ lấy cảm hứng từ NocoBase: mỗi tổ chức tự tạo ứng dụng, bảng dữ liệu và biểu mẫu, phân quyền thành viên, đính kèm tài liệu và tổ chức quy trình phê duyệt từ một giao diện React TypeScript.
+ShareBase giúp các tổ chức quản lý hồ sơ, công việc và quy trình phê duyệt trên cùng một hệ thống. Quản trị viên có thể tạo ứng dụng, thiết kế bảng dữ liệu và biểu mẫu, rồi phân quyền cho các thành viên sử dụng.
 
-Đây là dự án độc lập; không sử dụng mã nguồn hoặc plugin của NocoBase. Mã nguồn bàn giao chưa được build, chạy container hoặc test.
+Mỗi tổ chức có dữ liệu và thành viên riêng. Một tài khoản có thể tham gia nhiều tổ chức với các vai trò khác nhau.
 
-## Chức năng
+## Tính năng
 
-- Đăng nhập/đăng xuất SSO bằng Logto; tài khoản có thể tham gia nhiều tổ chức.
-- Chủ sở hữu, quản trị viên, biên tập viên và người chỉ đọc; vai trò khác nhau trong từng tổ chức.
-- Tạo ứng dụng và bảng dữ liệu; thiết kế trường văn bản, nhiều dòng, số, ngày, boolean, select và required.
-- Quyền đọc/ghi theo trường; quản trị viên luôn được quản lý trường, có thể ẩn trường với viewer hoặc chỉ cho admin ghi.
-- Tạo/sửa/xóa hồ sơ nháp, tìm theo tiêu đề, lọc trạng thái, phân trang; version chống ghi đè khi cùng sửa.
-- Upload/download tệp private PDF, PNG, JPEG, TXT; trao đổi hồ sơ qua CRUD GraphQL của Hasura.
-- Quy trình một cấp duyệt theo vai trò; không tự phê duyệt; trạng thái draft → pending → approved/rejected. Hồ sơ bị từ chối có thể sửa và gửi lại.
-- Dashboard, nhật ký hoạt động, thông báo cá nhân, cập nhật realtime và màn hình theo dõi/retry sự kiện.
-- Mẫu Văn phòng số / Đề nghị mua sắm được tạo trực tiếp từ UI.
+- Đăng nhập tập trung qua Logto.
+- Quản lý tổ chức và thành viên với bốn vai trò: owner, admin, editor và viewer.
+- Tạo ứng dụng, bảng dữ liệu và biểu mẫu với các trường văn bản, số, ngày, boolean và danh sách lựa chọn.
+- Thiết lập trường bắt buộc và quyền đọc, ghi theo từng trường.
+- Quản lý hồ sơ: tạo, sửa, xóa bản nháp, tìm kiếm, lọc trạng thái và phân trang.
+- Đính kèm và tải tài liệu PDF, PNG, JPEG, TXT.
+- Phê duyệt hồ sơ một cấp; hồ sơ bị từ chối có thể sửa và gửi lại.
+- Theo dõi thống kê, nhật ký hoạt động và thông báo theo thời gian thực.
+- Tạo ứng dụng từ mẫu Văn phòng số với quy trình đề nghị mua sắm.
 
 ## Kiến trúc
 
-Tầng 2 là frontend React + Vite. Tầng 1 là cụm dịch vụ headless có APISIX, Logto, PostgreSQL, Hasura, Express TypeScript, MinIO, n8n và Centrifugo. Người dùng cuối thao tác hoàn toàn qua ShareBase. Console quản trị hạ tầng chỉ dành cho người vận hành, không công bố qua gateway.
+Giao diện sử dụng React, TypeScript và Vite. Các dịch vụ phía server chạy bằng Docker Compose, tiếp nhận yêu cầu qua APISIX.
 
-| Thành phần   | Nhiệm vụ                                                       |
-| ------------ | -------------------------------------------------------------- |
-| APISIX       | Entry point, routing theo host/path, xác thực biên, rate limit |
-| Logto        | SSO/OIDC, access token, quản lý tài khoản                      |
-| Express Core | Quyền nghiệp vụ, schema động, phê duyệt, tệp, callback nội bộ  |
-| PostgreSQL   | Tenant, metadata ứng dụng, hồ sơ, workflow state, outbox       |
-| Hasura       | GraphQL có row/field permissions; CRUD trao đổi hồ sơ          |
-| MinIO        | Bucket private, versioning, lưu tệp                            |
-| n8n          | Điều phối giao vận sự kiện và thông báo bất đồng bộ            |
-| Centrifugo   | Thông báo refresh qua WebSocket với token ngắn hạn             |
+| Thành phần | Vai trò |
+| --- | --- |
+| APISIX | Điều hướng yêu cầu, xác thực tại gateway và giới hạn lưu lượng |
+| Logto | Đăng nhập SSO/OIDC và quản lý tài khoản |
+| Express Core | Xử lý phân quyền, dữ liệu động, phê duyệt và tệp đính kèm |
+| PostgreSQL | Lưu dữ liệu tổ chức, cấu hình ứng dụng, hồ sơ và sự kiện |
+| Hasura | Cung cấp GraphQL với quyền truy cập dữ liệu |
+| MinIO | Lưu tệp đính kèm trong bucket riêng tư |
+| n8n | Xử lý workflow và thông báo bất đồng bộ |
+| Centrifugo | Chuyển thông báo đến giao diện qua WebSocket |
 
-Mạng `internal` đặt `internal: true`. Chỉ gateway ở thêm mạng `edge`; mặc định production Compose chỉ publish gateway ở loopback. Dev override mở các cổng cần thiết ở loopback để Express trên host kết nối.
+Các dịch vụ lõi nằm trong mạng Docker nội bộ. Gateway kết nối thêm mạng `edge`; mặc định chỉ mở cổng trên loopback. Các cổng quản trị được mở riêng qua `compose.admin.yaml` khi cần cấu hình hoặc bảo trì.
 
 ## Cấu trúc dự án
 
@@ -51,9 +51,9 @@ Mạng `internal` đặt `internal: true`. Chỉ gateway ở thêm mạng `edge`
 | `server/compose.dev.yaml`   | Chạy Express và Vite trên host                            |
 | `server/compose.admin.yaml` | Console loopback trong thời gian bảo trì                  |
 
-## Yêu cầu máy
+## Yêu cầu môi trường
 
-Docker Engine và Compose 2.24.4+, Python 3.10+, Node.js 22/npm khi phát triển. Nên có 8 GB RAM. Máy cần tải được các registry image và npm registry trong lần chuẩn bị đầu tiên.
+Cần Docker Engine, Docker Compose 2.24.4 trở lên và Python 3.10 trở lên. Khi chạy chế độ phát triển, cài thêm Node.js 22 và npm. Khuyến nghị máy có ít nhất 8 GB RAM và kết nối Internet để tải image, dependency.
 
 Tên miền local: `localhost` cho app và `auth.localhost` cho Logto. Nếu hệ điều hành không tự resolve `auth.localhost`, thêm vào `/etc/hosts`:
 
@@ -71,13 +71,13 @@ python3 scripts/configure.py
 docker compose -f compose.yaml -f compose.admin.yaml up -d --build
 ```
 
-Script tạo `.env` từ `.env.example` và sinh secret ngẫu nhiên, không đổi secret đã có. Không chia sẻ `.env`, `core/.env`, `generated/` hoặc backup database. File `.env` dùng giá trị đơn giản không có dấu nháy; mật khẩu tự sinh là hex nên an toàn trong database URL.
+Script tạo `.env` từ `.env.example`, sinh các khóa bí mật và giữ nguyên giá trị đã cấu hình. Không đưa `.env`, `core/.env`, `generated/` hoặc bản sao lưu dữ liệu lên Git.
 
 Sau khi các dịch vụ sẵn sàng:
 
 1. Mở `http://localhost:3002`, tạo quản trị viên Logto.
 2. Tạo ứng dụng **Single-page app / React**. Redirect URI `http://localhost:8080/callback`; post sign-out URI `http://localhost:8080`.
-3. Tạo API resource với identifier `https://api.sharebase.local`. Bật username/password đăng nhập và đăng ký trong Sign-in experience. Không yêu cầu email connector cho demo local.
+3. Tạo API resource với identifier `https://api.sharebase.local`. Bật username/password đăng nhập và đăng ký trong Sign-in experience.
 4. Điền application ID vào `LOGTO_APP_ID` trong `server/.env`.
 5. Mở `http://localhost:5678`, tạo tài khoản owner n8n; không cần tạo workflow thủ công.
 6. Từ `server`, hoàn tất cấu hình:
@@ -154,7 +154,7 @@ sh scripts/bootstrap.sh prod
 
 Không chạy `docker compose down -v` nếu muốn giữ dữ liệu. Dùng cùng thư mục `server/.env` cho cả hai chế độ để tránh lệch password với volume.
 
-## Demo Văn phòng số
+## Sử dụng mẫu Văn phòng số
 
 1. Đăng nhập người A, tạo tổ chức “Công ty Bình Minh”. A tự trở thành owner của tổ chức đó.
 2. Mở Ứng dụng → **Dùng mẫu Văn phòng số**. Bảng Đề nghị mua sắm có tên hàng hóa, dự toán, lý do và ngày cần; workflow bật sẵn.
@@ -162,33 +162,33 @@ Không chạy `docker compose down -v` nếu muốn giữ dữ liệu. Dùng cù
 4. B chọn tổ chức, tạo hồ sơ, nhập dữ liệu, đính kèm tệp rồi gửi duyệt.
 5. A nhận thông báo, mở Trung tâm phê duyệt, bấm tên hồ sơ để xem nội dung/tệp rồi phê duyệt hoặc từ chối.
 6. B nhận thông báo kết quả. Dashboard và nhật ký phản ánh thao tác.
-7. Tạo tenant thứ hai bằng tài khoản khác để minh họa cách ly dữ liệu. Một tài khoản chỉ thấy các tổ chức mình là thành viên.
+7. Tạo tổ chức thứ hai bằng tài khoản khác để minh họa cách ly dữ liệu. Một tài khoản chỉ thấy các tổ chức mình là thành viên.
 
-Có thể tự thiết kế ứng dụng khác thay vì dùng mẫu. Chủ sở hữu nền tảng/hạ tầng không phải người duyệt nghiệp vụ của mọi tenant. Role owner ở đây là chủ của từng tổ chức.
+Có thể tự tạo ứng dụng và biểu mẫu theo nhu cầu của tổ chức. Vai trò `owner` thuộc từng tổ chức và chịu trách nhiệm quản lý thành viên, cấu hình ứng dụng trong tổ chức đó.
 
 ## Quyền và dữ liệu
 
 | Role   | Quyền                                                                                                           |
 | ------ | --------------------------------------------------------------------------------------------------------------- |
 | owner  | Quản trị tổ chức, quản lý admin, thiết kế ứng dụng; được duyệt nhưng không tự duyệt                             |
-| admin  | Thiết kế ứng dụng/biểu mẫu, quản lý editor/viewer, sửa hồ sơ trong tenant; duyệt khi vai trò quy trình là admin |
+| admin  | Thiết kế ứng dụng/biểu mẫu, quản lý editor/viewer, sửa hồ sơ trong tổ chức; duyệt khi vai trò quy trình là admin |
 | editor | Tạo hồ sơ, sửa/gửi hồ sơ của mình; duyệt hồ sơ người khác khi vai trò quy trình là editor                       |
 | viewer | Đọc hồ sơ và những trường được cấp quyền, tải tệp; không thay đổi dữ liệu                                       |
 
-Quyền hiện tại ở cấp **tenant + role + field**, chưa có custom role/department hoặc hạn chế từng collection. Tất cả thành viên tenant thấy tiêu đề, trạng thái hồ sơ và các tệp trong tenant; không đưa thông tin chỉ-admin vào tiêu đề/tệp nếu muốn ẩn bằng field permissions.
+Phân quyền trong phiên bản này dựa trên tổ chức, vai trò và trường dữ liệu; chưa hỗ trợ vai trò tùy chỉnh hoặc phân quyền theo phòng ban, bảng dữ liệu. Tất cả thành viên tổ chức thấy tiêu đề, trạng thái hồ sơ và các tệp trong tổ chức; không đưa thông tin chỉ-admin vào tiêu đề/tệp nếu muốn ẩn bằng field permissions.
 
-Schema động sử dụng `fields` và từng dòng JSONB `record_values`. Metadata Hasura có thể lọc từng giá trị; Core cũng áp dụng quyền này. Khóa ngoại ghép chặn liên kết chéo tenant. Chi tiết ở `server/db/README.md`.
+Schema động sử dụng `fields` và từng dòng JSONB `record_values`. Metadata Hasura có thể lọc từng giá trị; Core cũng áp dụng quyền này. Khóa ngoại ghép chặn liên kết chéo tổ chức. Chi tiết ở `server/db/README.md`.
 
 Audit ứng dụng ghi trong transaction của Core. CRUD comments qua Hasura không tạo audit Core; lịch sử comments hiện chỉ có tác giả/thời điểm tạo. Database owner có thể sửa database: audit không phải sổ cái bất biến.
 
-## API
+## API nghiệp vụ
 
-API nghiệp vụ cần `Authorization: Bearer <Logto access token>` và `X-Tenant-Id: <organization UUID>`. `/api/me` và tạo tổ chức không cần tenant đã tồn tại.
+API nghiệp vụ cần `Authorization: Bearer <Logto access token>` và `X-Tenant-Id: <organization UUID>`. `/api/me` và tạo tổ chức không cần tổ chức đã tồn tại.
 
 | Endpoint                                | Mục đích                                       |
 | --------------------------------------- | ---------------------------------------------- |
 | GET `/api/me`                           | Subject và tổ chức hiện có                     |
-| POST `/api/organizations`               | Tạo tenant và owner                            |
+| POST `/api/organizations`               | Tạo tổ chức và owner                            |
 | GET/PUT/DELETE `/api/members[/subject]` | Danh sách, gán role, gỡ thành viên             |
 | GET/POST `/api/apps`                    | Ứng dụng                                       |
 | POST `/api/templates/office`            | Tạo mẫu Văn phòng số                           |
@@ -201,7 +201,7 @@ API nghiệp vụ cần `Authorization: Bearer <Logto access token>` và `X-Tena
 | GET `/api/approvals`                    | Yêu cầu của mình / cần mình duyệt              |
 | POST `/api/approvals/:id/decide`        | Quyết định và nhận xét                         |
 | GET/POST `/api/records/:id/files`       | Tệp đính kèm                                   |
-| GET `/api/files/:id/download`           | Download có kiểm tra tenant                    |
+| GET `/api/files/:id/download`           | Tải tệp có kiểm tra quyền trong tổ chức                    |
 | GET `/api/dashboard`                    | Thống kê                                       |
 | GET `/api/notifications`                | Thông báo cá nhân                              |
 | POST `/api/notifications/read`          | Đánh dấu đã đọc                                |
@@ -218,37 +218,23 @@ Ví dụ tạo hồ sơ: `{"title":"Mua máy chiếu","data":{"item":"Máy chi�
 - `docker compose logs -f db migrate logto` theo dõi khởi tạo.
 - Dùng màn hình Vận hành để xem và retry sự kiện bị lỗi. Retry không tạo thông báo trùng trong database.
 - Mặc định worker chạy một instance; dùng SKIP LOCKED và lease cho phép mở rộng khi cần. Sự kiện giao at-least-once; realtime có thể lặp refresh.
-- `sh scripts/backup.sh` tạo snapshot database và object volume trong maintenance window. Script tạm dừng lưu lượng và writers trước khi chụp cả hai; dùng cho stack production mặc định. Sao lưu `.env` riêng bằng phương tiện mã hóa vì có n8n encryption key.
+- `sh scripts/backup.sh` tạo snapshot database và object volume trong thời gian bảo trì. Script tạm dừng lưu lượng và writers trước khi chụp cả hai; dùng cho stack production mặc định. Sao lưu `.env` riêng bằng phương tiện mã hóa vì có n8n encryption key.
 - Khôi phục trên môi trường trống: khởi động riêng `db` (dùng đúng secret), nhập dump với `psql -U postgres`, khôi phục archive vào MinIO `/data` khi service đang dừng, rồi khởi động stack. `pg_dumpall` chứa roles và database; khi khôi phục vào DB đã init, cần xử lý các role/database đã tồn tại thay vì nhập đè tùy tiện.
 - Tệp đính kèm không có chức năng xóa trong UI; hồ sơ có tệp hoặc lịch sử phê duyệt được giữ lại. MinIO versioning hỗ trợ khôi phục nhưng cần chính sách retention/lifecycle riêng cho vận hành dài hạn.
 
-Nếu lỗi `password authentication failed`, `.env` và password trong volume có thể không khớp. Khôi phục `.env` ban đầu hoặc đổi password của đúng role bằng tài khoản quản trị PostgreSQL, rồi recreate dịch vụ dùng credential đó. Không xóa volume để “sửa nhanh”.
+Nếu lỗi `password authentication failed`, `.env` và password trong volume có thể không khớp. Khôi phục `.env` ban đầu hoặc đổi password của đúng role bằng tài khoản quản trị PostgreSQL, rồi recreate dịch vụ dùng credential đó. Không xóa volume khi cần giữ dữ liệu hiện có.
 
-## Production qua Internet
+## Triển khai trên máy chủ
 
-`compose.yaml` chạy toàn bộ dịch vụ bằng container, nhưng default network binding là local HTTP. Để đưa ra Internet:
+`compose.yaml` chạy toàn bộ dịch vụ bằng container, nhưng cấu hình mặc định dùng HTTP trên máy cục bộ. Để đưa ra Internet:
 
 - Dùng hai domain HTTPS cho app và Logto, TLS load balancer chuyển đến APISIX. Không forward bất kỳ cổng lõi/admin nào ra Internet.
 - Đặt `PUBLIC_ORIGIN`, `AUTH_ORIGIN`, redirect URI và sign-out URI theo domain HTTPS; render config rồi recreate các dịch vụ bị thay đổi.
 - Nếu load balancer ở máy khác, chỉnh `GATEWAY_BIND` và firewall chỉ cho IP load balancer gọi gateway. Cấu hình trusted proxy/real IP chính xác trước khi rate-limit theo địa chỉ người dùng.
-- Lưu secret ở secret manager phù hợp; định kỳ vá image/dependency và pin digest sau khi kiểm thử deployment cụ thể. Package ranges không phải lockfile tái lập tuyệt đối; bản bàn giao chưa cài dependencies để sinh lockfile.
+- Quản lý khóa bí mật riêng theo môi trường, duy trì lockfile và cố định phiên bản image đã kiểm thử trước khi triển khai.
 - Bổ sung antivirus/quarantine và giới hạn lưu trữ trước khi nhận tệp công khai; MIME allowlist không thay thế kiểm dịch.
 - Nếu cần email/external workflow, bổ sung egress proxy/rule cho đúng dịch vụ. Mạng internal hiện ngăn truy cập Internet từ các engine.
 
-## Quan hệ với đề DX-OS Open-Core
+## Giấy phép
 
-ShareBase triển khai các nhóm lõi Identity/SSO, Gateway, structured/unstructured data và Workflow trong stack được chọn. Tầng 2 minh họa **H** (thành viên, trao đổi), **P** (biểu mẫu, hồ sơ, phê duyệt), **D** (dashboard). Đề yêu cầu ít nhất một ứng dụng trong không gian H–P–D–I, không buộc phải triển khai cả bốn không gian.
-
-Phần chưa triển khai: AI thuộc I, phân tầng dữ liệu nóng/ấm/lạnh, tích hợp OT/digital twin, data lineage toàn hệ thống, GitOps tự phục hồi, mTLS giữa mọi service, kiểm dịch malware và audit bất biến. Docker internal network, JWT và permission checks là các biện pháp cụ thể đã có, không đồng nghĩa hoàn tất toàn bộ mô hình Zero-Trust ở quy mô doanh nghiệp.
-
-n8n sử dụng fair-code/Sustainable Use License; các engine khác cũng có giấy phép riêng. Đối chiếu yêu cầu PMNM của BTC khi lập danh mục thành phần. Mã tự viết của ShareBase có giấy phép MIT trong `LICENSE`; giấy phép này không thay thế giấy phép các dependency hay Docker image.
-
-## Tài liệu công nghệ
-
-- [APISIX standalone](https://apisix.apache.org/docs/apisix/deployment-modes/)
-- [APISIX forward-auth](https://apisix.apache.org/docs/apisix/plugins/forward-auth/)
-- [Logto React](https://docs.logto.io/quick-starts/react)
-- [Hasura authentication](https://hasura.io/docs/2.0/auth/authentication/index/)
-- [Centrifugo authentication](https://centrifugal.dev/docs/server/authentication)
-- [n8n Server CLI](https://docs.n8n.io/deploy/host-n8n/configure-n8n/use-the-command-line)
-- [n8n license](https://github.com/n8n-io/n8n-docs/blob/main/docs/n8n-community-license/README.md)
+Mã nguồn ShareBase sử dụng giấy phép MIT. Xem [LICENSE](LICENSE) để biết chi tiết. Các thư viện và dịch vụ đi kèm tuân theo giấy phép riêng của từng dự án.

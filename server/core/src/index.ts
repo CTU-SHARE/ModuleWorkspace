@@ -1,3 +1,4 @@
+import './builder/records.js';
 import './builder/defaults.js';
 import './builder/validation.js';
 import './builder/file-fields.js';
