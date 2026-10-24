@@ -1,3 +1,4 @@
+import './builder/defaults.js';
 import './builder/validation.js';
 import './builder/file-fields.js';
 import { loadRecord, saveRecord, recordInput } from './builder/records-service.js';
