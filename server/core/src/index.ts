@@ -22,6 +22,8 @@ import {
   HttpError,
   type Context,
 } from './auth.js';
+import { builder } from './builder/base.js';
+import { collection as authorizedCollection } from './builder/base.js';
 import { deliverEvent } from './workflow.js';
 const app = express();
 app.disable('x-powered-by');
@@ -52,6 +54,7 @@ const run =
   };
 const ctx = (q: Request) => context(q.headers.authorization, q.headers['x-tenant-id']);
 const id = (q: Request, key = 'id') => uuid.parse(q.params[key]);
+app.use('/api/builder', builder);
 app.get(
   '/health',
   run(async (_q, s) => {
@@ -420,6 +423,7 @@ async function loadRecord(c: Context, rid: string) {
     await pool.query('SELECT * FROM records WHERE tenant_id=$1 AND id=$2', [c.tenant, rid])
   ).rows[0];
   if (!r) fail(404, 'Không tìm thấy hồ sơ');
+  await authorizedCollection(c, r.collection_id);
   const values = (
     await pool.query(
       'SELECT f.key,v.value FROM record_values v JOIN fields f ON f.id=v.field_id JOIN field_permissions p ON p.field_id=f.id AND p.role=$3 WHERE v.tenant_id=$1 AND v.record_id=$2',
@@ -432,6 +436,7 @@ app.get(
   '/api/collections/:id/records',
   run(async (q, s) => {
     const c = await ctx(q);
+    await authorizedCollection(c, id(q));
     const page = z.coerce.number().int().min(1).default(1).parse(q.query.page);
     const search = z.string().max(200).default('').parse(q.query.search);
     const status = z
@@ -500,6 +505,7 @@ async function saveRecord(
       ])
     ).rows[0];
     if (!col) fail(404, 'Không tìm thấy bảng');
+    await authorizedCollection(c, collection, db);
     if (rid) {
       const old = (
         await db.query('SELECT * FROM records WHERE tenant_id=$1 AND id=$2 FOR UPDATE', [
@@ -797,6 +803,7 @@ app.get(
       await pool.query('SELECT * FROM files WHERE tenant_id=$1 AND id=$2', [c.tenant, id(q)])
     ).rows[0];
     if (!f) fail(404, 'Không tìm thấy tệp');
+    await loadRecord(c, f.record_id);
     const obj = await s3.send(new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: f.object_key }));
     s.setHeader('Content-Type', 'application/octet-stream');
     s.setHeader(
@@ -923,6 +930,21 @@ app.use((e: any, _q: Request, s: Response, _n: NextFunction) => {
     }),
   );
   s.status(status).json({
+    code:
+      e instanceof z.ZodError
+        ? 'VALIDATION_ERROR'
+        : status === 409
+          ? 'CONFLICT'
+          : status === 403
+            ? 'FORBIDDEN'
+            : status === 401
+              ? 'UNAUTHENTICATED'
+              : status === 404
+                ? 'NOT_FOUND'
+                : status === 500
+                  ? 'INTERNAL_ERROR'
+                  : 'INVALID_REQUEST',
+    fieldErrors: e instanceof z.ZodError ? e.flatten().fieldErrors : {},
     error:
       status === 500
         ? 'Lỗi máy chủ'
