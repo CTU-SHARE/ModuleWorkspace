@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Collections } from './Collections';
 import { AppList } from './AppList';
 import { AsyncForm } from '../components/AsyncForm';
 import type { API } from '../useApi';
@@ -72,7 +73,16 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
                 />
               </details>
             ))}
-          {/* COLLECTION_LIST */}
+          <Collections
+            key={app.id}
+            api={api}
+            app={app}
+            fields={[]}
+            admin={admin}
+            role={role}
+            user={user}
+            refresh={refresh}
+          />
         </>
       )}
     </section>
