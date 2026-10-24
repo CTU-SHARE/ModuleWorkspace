@@ -1,3 +1,4 @@
+import './Fields';
 import { useState } from 'react';
 import { Collections } from './Collections';
 import { AppList } from './AppList';

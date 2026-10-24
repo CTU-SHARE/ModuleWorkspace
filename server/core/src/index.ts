@@ -23,6 +23,7 @@ import {
   type Context,
 } from './auth.js';
 import './builder/apps.js';
+import './builder/fields.js';
 import './builder/collections.js';
 import { builder } from './builder/base.js';
 import { collection as authorizedCollection } from './builder/base.js';
