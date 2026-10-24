@@ -1,3 +1,4 @@
+import './builder/validation.js';
 import './builder/file-fields.js';
 import { loadRecord, saveRecord, recordInput } from './builder/records-service.js';
 import express, { type Request, type Response, type NextFunction } from 'express';
