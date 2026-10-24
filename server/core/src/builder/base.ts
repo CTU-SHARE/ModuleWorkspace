@@ -30,7 +30,7 @@ export async function application(c: Context, id: string, db: DB = pool) {
     fail(403, 'Không có quyền truy cập ứng dụng');
   return a;
 }
-export async function collection(c: Context, id: string, db: DB = pool) {
+export async function collection(c: Context, id: string, db: DB = pool, allowArchived = false) {
   const col = (
     await db.query('SELECT * FROM collections WHERE tenant_id=$1 AND id=$2', [
       c.tenant,
@@ -38,6 +38,7 @@ export async function collection(c: Context, id: string, db: DB = pool) {
     ])
   ).rows[0];
   if (!col) fail(404, 'Không tìm thấy bảng');
+  if (col.archived_at && !allowArchived) fail(409, 'Bảng đã được lưu trữ');
   const a = await application(c, col.app_id, db);
   if (a.config.modules?.records === false) fail(403, 'Module dữ liệu đã tắt');
   return col;

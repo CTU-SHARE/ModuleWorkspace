@@ -23,6 +23,7 @@ import {
   Trash2,
   RefreshCw,
 } from 'lucide-react';
+import { Studio } from './builder/Studio';
 import type { Config } from './main';
 import { useApi, type API } from './useApi';
 type Row = Record<string, any>;
@@ -171,7 +172,7 @@ function Workspace({ config }: { config: Config }) {
     };
   }, [api, tenant, isAuthenticated, tick]);
   useEffect(() => {
-    if (!tenant || !isAuthenticated) return;
+    if (!tenant || !isAuthenticated || view === 'studio') return;
     const v = ++version.current;
     // Debounce search/navigation before issuing requests; cleanup also handles StrictMode.
     const timer = setTimeout(() => {
@@ -327,6 +328,7 @@ function Workspace({ config }: { config: Config }) {
           {[
             [LayoutDashboard, 'dashboard', 'Tổng quan'],
             [Layers3, 'apps', 'Ứng dụng'],
+            [Settings2, 'studio', 'Thiết kế ứng dụng'],
             [CheckCheck, 'approvals', 'Phê duyệt'],
             [Users, 'members', 'Thành viên'],
             [Bell, 'notifications', 'Thông báo'],
@@ -388,6 +390,9 @@ function Workspace({ config }: { config: Config }) {
           </div>
         </div>
         <div className="content">
+          {view === 'studio' && tenant && (
+            <Studio key={tenant} api={api} role={org?.role || 'viewer'} user={me?.user || ''} />
+          )}
           {error && (
             <div role="alert" className="alert error">
               {error}

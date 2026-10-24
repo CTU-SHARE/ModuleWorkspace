@@ -1,0 +1,79 @@
+import { useState } from 'react';
+import { AsyncForm } from '../components/AsyncForm';
+import type { API } from '../useApi';
+import { appPanels, appTools, collectionPanels, type Row } from './registry';
+export function Studio({ api, role, user }: { api: API; role: string; user: string }) {
+  const [app, setApp] = useState<Row | null>(null),
+    [tick, setTick] = useState(0);
+  const admin = ['owner', 'admin'].includes(role);
+  const refresh = () => setTick((t) => t + 1);
+  return (
+    <section className="panel" style={{ padding: 24 }}>
+      <h2>Ứng dụng cấu hình</h2>
+      {admin && (
+        <details>
+          <summary>Tạo ứng dụng</summary>
+          <AsyncForm
+            submit={async (f) => {
+              setApp(await api('/api/builder/apps', 'POST', Object.fromEntries(f)));
+              refresh();
+            }}
+          >
+            <label>
+              Tên
+              <input name="name" required maxLength={160} />
+            </label>
+            <label>
+              Mô tả
+              <textarea name="description" maxLength={2000} />
+            </label>
+            <label>
+              Biểu tượng
+              <select name="icon">
+                {['Layers3', 'School', 'Briefcase', 'Users', 'Folder', 'Calendar'].map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </label>
+            <button>Tạo ứng dụng</button>
+          </AsyncForm>
+        </details>
+      )}
+      {appTools.map(({ id, component: Component }) => (
+        <Component
+          key={id}
+          api={api}
+          app={app || {}}
+          fields={[]}
+          admin={admin}
+          role={role}
+          user={user}
+          refresh={refresh}
+        />
+      ))}
+      {/* APPLICATION_LIST */}
+      {app && (
+        <>
+          <h3>{app.name}</h3>
+          {appPanels
+            .filter((x) => !x.adminOnly || admin)
+            .map(({ id, name, component: Component }) => (
+              <details key={id}>
+                <summary>{name}</summary>
+                <Component
+                  api={api}
+                  app={app}
+                  fields={[]}
+                  admin={admin}
+                  role={role}
+                  user={user}
+                  refresh={refresh}
+                />
+              </details>
+            ))}
+          {/* COLLECTION_LIST */}
+        </>
+      )}
+    </section>
+  );
+}

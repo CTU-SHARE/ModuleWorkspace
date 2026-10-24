@@ -22,6 +22,7 @@ import {
   HttpError,
   type Context,
 } from './auth.js';
+import './builder/apps.js';
 import { builder } from './builder/base.js';
 import { collection as authorizedCollection } from './builder/base.js';
 import { deliverEvent } from './workflow.js';
