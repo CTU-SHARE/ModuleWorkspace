@@ -2,7 +2,7 @@ import { useState, type ComponentType } from 'react';
 import { AsyncForm } from '../components/AsyncForm';
 import { useLoad } from './hooks';
 import { collectionPanels, type PanelProps, type Row } from './registry';
-export const types = ['text', 'textarea', 'number', 'date', 'boolean', 'select'];
+export const types = ['text', 'textarea', 'number', 'date', 'boolean', 'select', 'json', 'file'];
 export type FieldOptionsProps = {
   value: Row;
   change: (v: Row) => void;
@@ -14,15 +14,31 @@ export type FieldOptionsProps = {
 export const fieldOptions: { name: string; component: ComponentType<FieldOptionsProps> }[] = [];
 export function FieldEditor(p: PanelProps) {
   const [selected, setSelected] = useState<Row | null>(null),
-    [tick, setTick] = useState(0);
+    [tick, setTick] = useState(0),
+    [archived, setArchived] = useState(false);
   const cid = p.collection!.id;
-  const { data, error } = useLoad(p.api, `/api/builder/collections/${cid}/fields`, tick);
+  const { data, error } = useLoad(
+    p.api,
+    `/api/builder/collections/${cid}/fields?archived=${archived}`,
+    tick,
+  );
   return (
     <div>
+      <label>
+        <input
+          type="checkbox"
+          checked={archived}
+          onChange={(e) => {
+            setArchived(e.target.checked);
+            setSelected(null);
+          }}
+        />
+        Hiện trường đã lưu trữ
+      </label>
       {error && <p role="alert">{error}</p>}
       {data?.map((f: Row) => (
         <button key={f.id} onClick={() => setSelected(f)}>
-          {f.label} ({f.type})
+          {f.label} ({f.type}){f.archived_at ? ' — đã lưu trữ' : ''}
         </button>
       ))}
       <button
@@ -39,7 +55,28 @@ export function FieldEditor(p: PanelProps) {
       >
         Thêm trường
       </button>
-      {selected && (
+      {selected?.id && (
+        <AsyncForm
+          submit={async () => {
+            if (
+              !confirm(
+                selected.archived_at ? 'Khôi phục trường?' : 'Lưu trữ trường? Giá trị cũ được giữ.',
+              )
+            )
+              return;
+            await p.api(`/api/builder/collections/${cid}/fields/${selected.id}/archive`, 'POST', {
+              version: selected.version,
+              archived: !selected.archived_at,
+            });
+            setSelected(null);
+            setTick((t) => t + 1);
+            p.refresh();
+          }}
+        >
+          <button>{selected.archived_at ? 'Khôi phục trường' : 'Lưu trữ trường'}</button>
+        </AsyncForm>
+      )}
+      {selected && !selected.archived_at && (
         <FieldForm
           key={selected.id + ':' + tick}
           {...p}
