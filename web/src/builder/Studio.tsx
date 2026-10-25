@@ -1,3 +1,4 @@
+import './Details';
 import './Modules';
 import './Menus';
 import './Pages';
