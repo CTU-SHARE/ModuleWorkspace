@@ -1,6 +1,1 @@
-{
-  "endpoint": "http://auth.localhost:8080",
-  "appId": "ucz2aj1dtq27u6mrn5wlc",
-  "resource": "https://api.sharebase.local",
-  "origin": "http://localhost:8080"
-}
+{"endpoint": "http://auth.localhost:8080", "appId": "o3deon2rgx3ri5l1o5wol", "resource": "https://api.sharebase.local", "origin": "http://localhost:8080"}

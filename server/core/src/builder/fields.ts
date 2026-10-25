@@ -6,6 +6,7 @@ import {
   collection,
   identifier,
   title,
+  revision,
   admin,
   pool,
   requireVersion,
