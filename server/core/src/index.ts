@@ -1,3 +1,4 @@
+import './builder/conditions.js';
 import './builder/details.js';
 import './builder/modules.js';
 import './builder/menus.js';
