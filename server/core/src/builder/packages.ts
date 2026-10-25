@@ -6,7 +6,7 @@ import type { Context } from '../auth.js';
 import { appInput } from './apps.js';
 import { fieldSchema, fieldConfigChecks, fieldAsyncChecks, fieldsFor } from './fields.js';
 import { appConfigChecks } from './app-settings.js';
-import { collectionConfigChecks } from './configuration.js';
+import { collectionConfigChecks, collectionAsyncChecks } from './configuration.js';
 import { pageConfig, checkPage } from './pages.js';
 export const packageSchema = z.object({
   format: z.literal('sharebase.app'),
@@ -42,13 +42,13 @@ const pick = (o: Row, keys: string[]) =>
   Object.fromEntries(keys.filter((k) => Object.hasOwn(o, k)).map((k) => [k, o[k]]));
 const appKeys = ['roles', 'menu', 'modules'],
   colKeys = ['table', 'form', 'actions', 'tree', 'kanban', 'calendar', 'gantt', 'dashboard'],
-  fieldKeys = ['validation', 'default', 'formula', 'visibility', 'linkage', 'relation'];
+  fieldKeys = ['validation', 'default', 'formula', 'visible', 'linkage', 'relation'];
 export async function exportPackage(c: Context, id: string) {
   admin(c);
   const a = await application(c, id);
   const cols = (
     await pool.query(
-      'SELECT * FROM collections WHERE tenant_id=$1 AND app_id=$2 ORDER BY created_at,id',
+      'SELECT * FROM collections WHERE tenant_id=$1 AND app_id=$2 AND archived_at IS NULL ORDER BY created_at,id',
       [c.tenant, id],
     )
   ).rows;
@@ -212,6 +212,7 @@ export async function installPackage(c: Context, input: unknown, name?: string) 
       const fields = await fieldsFor(c, col.id, db);
       for (const field of fields)
         for (const check of fieldAsyncChecks) await check(c, db, actual, field, field);
+      for (const check of collectionAsyncChecks) await check(c, db, actual, col.config);
     }
     for (const page of b.pages) {
       await checkPage(c, app.id, page.config, db);

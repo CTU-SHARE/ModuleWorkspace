@@ -1,3 +1,4 @@
+import './Kanban';
 import './Templates';
 import './Cloning';
 import './Packages';
