@@ -1,3 +1,4 @@
+import './Actions';
 import './Visibility';
 import './Details';
 import './Modules';
