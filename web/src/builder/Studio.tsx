@@ -1,3 +1,4 @@
+import './Pages';
 import './AppSettings';
 import './Forms';
 import './Records';

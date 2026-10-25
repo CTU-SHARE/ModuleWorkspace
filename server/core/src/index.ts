@@ -1,3 +1,4 @@
+import './builder/pages.js';
 import './builder/app-settings.js';
 import { legacyAccess } from './builder/legacy-access.js';
 import './builder/forms.js';
