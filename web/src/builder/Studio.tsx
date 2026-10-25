@@ -1,3 +1,5 @@
+import { LazyPanel } from './LazyPanel';
+import './Dashboard';
 import './Gantt';
 import './Calendar';
 import './Kanban';
@@ -29,7 +31,8 @@ import type { API } from '../useApi';
 import { appPanels, appTools, collectionPanels, type Row } from './registry';
 export function Studio({ api, role, user }: { api: API; role: string; user: string }) {
   const [app, setApp] = useState<Row | null>(null),
-    [tick, setTick] = useState(0);
+    [tick, setTick] = useState(0),
+    [error, setError] = useState('');
   useEffect(() => {
     if (!app) return;
     let alive = true;
@@ -37,7 +40,12 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
       .then((a) => {
         if (alive) setApp(a);
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (alive) {
+          setError(e.message);
+          setApp(null);
+        }
+      });
     return () => {
       alive = false;
     };
@@ -47,6 +55,7 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
   return (
     <section className="panel" style={{ padding: 24 }}>
       <h2>Ứng dụng cấu hình</h2>
+      {error && <p role="alert">{error}</p>}
       {admin && (
         <details>
           <summary>Tạo ứng dụng</summary>
@@ -76,18 +85,20 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
           </AsyncForm>
         </details>
       )}
-      {appTools.map(({ id, component: Component }) => (
-        <Component
-          key={id}
-          api={api}
-          app={app || {}}
-          fields={[]}
-          admin={admin}
-          role={role}
-          user={user}
-          refresh={refresh}
-        />
-      ))}
+      {appTools
+        .filter((x) => !x.adminOnly || admin)
+        .map(({ id, component: Component }) => (
+          <Component
+            key={id}
+            api={api}
+            app={app || {}}
+            fields={[]}
+            admin={admin}
+            role={role}
+            user={user}
+            refresh={refresh}
+          />
+        ))}
       <AppList api={api} tick={tick} select={setApp} />
       {app && (
         <>
@@ -99,8 +110,7 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
                 (!['pages', 'menu'].includes(x.id) || app.config.modules?.pages !== false),
             )
             .map(({ id, name, component: Component }) => (
-              <details key={id}>
-                <summary>{name}</summary>
+              <LazyPanel key={app.id + ':' + id} title={name}>
                 <Component
                   api={api}
                   app={app}
@@ -110,7 +120,7 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
                   user={user}
                   refresh={refresh}
                 />
-              </details>
+              </LazyPanel>
             ))}
           {app.config.modules?.records !== false && (
             <Collections

@@ -1,3 +1,4 @@
+import './builder/dashboard.js';
 import './builder/gantt.js';
 import './builder/calendar.js';
 import './builder/views.js';
@@ -319,7 +320,7 @@ app.get(
     s.json(
       (
         await pool.query(
-          'SELECT * FROM collections WHERE tenant_id=$1 AND EXISTS(SELECT 1 FROM app_roles ar WHERE ar.app_id=collections.app_id AND ar.role=$2) ORDER BY created_at',
+          'SELECT * FROM collections WHERE tenant_id=$1 AND archived_at IS NULL AND EXISTS(SELECT 1 FROM app_roles ar WHERE ar.app_id=collections.app_id AND ar.role=$2) ORDER BY created_at',
           [c.tenant, c.role],
         )
       ).rows,
@@ -382,7 +383,7 @@ app.get(
     s.json(
       (
         await pool.query(
-          `SELECT f.*,p.can_write FROM fields f JOIN field_permissions p ON p.field_id=f.id AND p.role=$3 WHERE f.tenant_id=$1 AND f.collection_id=$2 ORDER BY position,key`,
+          `SELECT f.*,p.can_write FROM fields f JOIN field_permissions p ON p.field_id=f.id AND p.role=$3 WHERE f.tenant_id=$1 AND f.collection_id=$2 AND f.archived_at IS NULL ORDER BY position,key`,
           [c.tenant, id(q), c.role],
         )
       ).rows,
@@ -599,7 +600,7 @@ app.get(
     s.json(
       (
         await pool.query(
-          `SELECT a.*,r.title FROM approvals a JOIN records r ON r.id=a.record_id WHERE a.tenant_id=$1 AND (a.requested_by=$2 OR a.reviewer_role=$3 OR $3='owner') ORDER BY a.created_at DESC LIMIT 100`,
+          `SELECT a.*,r.title FROM approvals a JOIN records r ON r.id=a.record_id WHERE a.tenant_id=$1 AND (a.requested_by=$2 OR a.reviewer_role=$3 OR $3='owner') AND EXISTS(SELECT 1 FROM collections co JOIN apps ap ON ap.id=co.app_id JOIN app_roles ar ON ar.app_id=ap.id WHERE co.id=r.collection_id AND ar.role=$3 AND co.tenant_id=$1 AND ap.config->'modules'->>'records' IS DISTINCT FROM 'false' AND ap.config->'modules'->>'approvals' IS DISTINCT FROM 'false') ORDER BY a.created_at DESC LIMIT 100`,
           [c.tenant, c.user, c.role],
         )
       ).rows,
@@ -618,6 +619,17 @@ app.post(
       .parse(q.body);
     s.json(
       await tx(async (db) => {
+        const reference = (
+          await db.query('SELECT record_id FROM approvals WHERE tenant_id=$1 AND id=$2', [
+            c.tenant,
+            id(q),
+          ])
+        ).rows[0];
+        if (!reference) fail(404, 'Không tìm thấy yêu cầu');
+        await db.query('SELECT id FROM records WHERE tenant_id=$1 AND id=$2 FOR UPDATE', [
+          c.tenant,
+          reference.record_id,
+        ]);
         const a = (
           await db.query('SELECT * FROM approvals WHERE tenant_id=$1 AND id=$2 FOR UPDATE', [
             c.tenant,
@@ -786,10 +798,13 @@ app.get(
     const c = await ctx(q);
     const [counts, apps, members] = await Promise.all([
       pool.query(
-        'SELECT status,count(*)::int AS count FROM records WHERE tenant_id=$1 GROUP BY status',
-        [c.tenant],
+        "SELECT r.status,count(*)::int AS count FROM records r JOIN collections co ON co.id=r.collection_id JOIN apps ap ON ap.id=co.app_id JOIN app_roles ar ON ar.app_id=ap.id AND ar.role=$2 WHERE r.tenant_id=$1 AND ap.config->'modules'->>'records' IS DISTINCT FROM 'false' GROUP BY r.status",
+        [c.tenant, c.role],
       ),
-      pool.query('SELECT count(*)::int AS count FROM apps WHERE tenant_id=$1', [c.tenant]),
+      pool.query(
+        'SELECT count(*)::int AS count FROM apps WHERE tenant_id=$1 AND EXISTS(SELECT 1 FROM app_roles ar WHERE ar.app_id=apps.id AND ar.role=$2)',
+        [c.tenant, c.role],
+      ),
       pool.query('SELECT count(*)::int AS count FROM memberships WHERE tenant_id=$1', [c.tenant]),
     ]);
     s.json({ statuses: counts.rows, apps: apps.rows[0].count, members: members.rows[0].count });
@@ -844,11 +859,15 @@ app.use((e: any, _q: Request, s: Response, _n: NextFunction) => {
       ? e.status
       : e instanceof z.ZodError
         ? 400
-        : e instanceof multer.MulterError
-          ? 400
-          : ['23505', '23503', '22P02'].includes(e.code)
-            ? 409
-            : 500;
+        : e.type === 'entity.too.large'
+          ? 413
+          : e instanceof SyntaxError
+            ? 400
+            : e instanceof multer.MulterError
+              ? 400
+              : ['23505', '23503', '22P02'].includes(e.code)
+                ? 409
+                : 500;
   console.error(
     JSON.stringify({
       level: 'error',
@@ -872,7 +891,7 @@ app.use((e: any, _q: Request, s: Response, _n: NextFunction) => {
                 : status === 500
                   ? 'INTERNAL_ERROR'
                   : 'INVALID_REQUEST',
-    fieldErrors: e instanceof z.ZodError ? e.flatten().fieldErrors : {},
+    fieldErrors: e instanceof z.ZodError ? e.flatten().fieldErrors : e.fieldErrors || {},
     error:
       status === 500
         ? 'Lỗi máy chủ'
