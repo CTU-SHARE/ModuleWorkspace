@@ -1,3 +1,4 @@
+import './builder/trees.js';
 import './builder/formulas.js';
 import './builder/relations.js';
 import './builder/actions.js';
