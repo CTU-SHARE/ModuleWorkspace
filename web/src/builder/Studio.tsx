@@ -1,3 +1,4 @@
+import './Templates';
 import './Cloning';
 import './Packages';
 import './DataTransfer';
