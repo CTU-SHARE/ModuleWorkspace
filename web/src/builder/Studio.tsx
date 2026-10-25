@@ -1,3 +1,4 @@
+import './Linkage';
 import './Trees';
 import './FormulaOptions';
 import './Relations';

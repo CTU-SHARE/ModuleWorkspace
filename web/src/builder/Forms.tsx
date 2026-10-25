@@ -4,6 +4,7 @@ import { ValueInput, formValues } from './ValueInput';
 import { useLoad } from './hooks';
 import { collectionPanels, type PanelProps, type Row } from './registry';
 import { recordUI, type RecordProps } from './Records';
+export const formField: { resolve: (field: Row, values: Row) => Row } = { resolve: (f) => f };
 export const formRules: { visible: (field: Row, values: Row) => boolean } = { visible: () => true };
 export const formPlugins: ComponentType<{
   values: Row;
@@ -89,7 +90,7 @@ export function RecordForm(p: RecordProps) {
                   {f.required ? ' *' : ''}
                   <ValueInput
                     api={p.api}
-                    field={f}
+                    field={formField.resolve(f, values)}
                     value={values[key]}
                     disabled={!editable || !f.can_write || !!f.config?.formula}
                     change={(v) => setValues((old) => ({ ...old, [key]: v }))}
