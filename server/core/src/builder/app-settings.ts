@@ -38,6 +38,22 @@ builder.put(
         ]);
         const a = await application(c, String(q.params.id), db);
         requireVersion(a.version, b.version);
+        for (const item of (b.config.menu || []) as Row[]) {
+          if (item.page_id) {
+            const page = await db.query(
+              'SELECT id FROM app_pages WHERE tenant_id=$1 AND app_id=$2 AND id=$3',
+              [c.tenant, a.id, item.page_id],
+            );
+            if (!page.rowCount)
+              throw new z.ZodError([
+                {
+                  code: 'custom',
+                  path: ['config', 'menu'],
+                  message: 'Trang menu không thuộc ứng dụng',
+                },
+              ]);
+          }
+        }
         const r = (
           await db.query(
             'UPDATE apps SET name=$3,description=$4,icon=$5,config=$6 WHERE tenant_id=$1 AND id=$2 RETURNING *',

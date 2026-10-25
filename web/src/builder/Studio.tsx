@@ -1,3 +1,4 @@
+import './Menus';
 import './Pages';
 import './AppSettings';
 import './Forms';

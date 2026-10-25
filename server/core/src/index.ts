@@ -1,3 +1,4 @@
+import './builder/menus.js';
 import './builder/pages.js';
 import './builder/app-settings.js';
 import { legacyAccess } from './builder/legacy-access.js';
