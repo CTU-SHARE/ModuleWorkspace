@@ -1,3 +1,4 @@
+import './Gantt';
 import './Calendar';
 import './Kanban';
 import './Templates';

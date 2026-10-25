@@ -1,3 +1,4 @@
+import './builder/gantt.js';
 import './builder/calendar.js';
 import './builder/views.js';
 import './builder/templates.js';
