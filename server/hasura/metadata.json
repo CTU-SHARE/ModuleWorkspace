@@ -67,12 +67,39 @@
               "permission": {
                 "columns": ["id", "tenant_id", "name", "description", "created_at"],
                 "filter": {
-                  "tenant_id": {
-                    "_eq": "X-Hasura-Tenant-Id"
-                  }
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "access_roles": {
+                        "role": {
+                          "_eq": "X-Hasura-App-Role"
+                        }
+                      }
+                    }
+                  ]
                 },
                 "limit": 100,
                 "allow_aggregations": true
+              }
+            }
+          ],
+          "array_relationships": [
+            {
+              "name": "access_roles",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "app_roles"
+                  },
+                  "column_mapping": {
+                    "id": "app_id"
+                  }
+                }
               }
             }
           ]
@@ -97,12 +124,42 @@
                   "created_at"
                 ],
                 "filter": {
-                  "tenant_id": {
-                    "_eq": "X-Hasura-Tenant-Id"
-                  }
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "app_access": {
+                        "access_roles": {
+                          "role": {
+                            "_eq": "X-Hasura-App-Role"
+                          }
+                        }
+                      }
+                    }
+                  ]
                 },
                 "limit": 100,
                 "allow_aggregations": true
+              }
+            }
+          ],
+          "object_relationships": [
+            {
+              "name": "app_access",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "apps"
+                  },
+                  "column_mapping": {
+                    "app_id": "id"
+                  },
+                  "insertion_order": null
+                }
               }
             }
           ]
@@ -147,14 +204,29 @@
                 "filter": {
                   "_and": [
                     {
-                      "tenant_id": {
-                        "_eq": "X-Hasura-Tenant-Id"
-                      }
+                      "_and": [
+                        {
+                          "tenant_id": {
+                            "_eq": "X-Hasura-Tenant-Id"
+                          }
+                        },
+                        {
+                          "permissions": {
+                            "role": {
+                              "_eq": "X-Hasura-App-Role"
+                            }
+                          }
+                        }
+                      ]
                     },
                     {
-                      "permissions": {
-                        "role": {
-                          "_eq": "X-Hasura-App-Role"
+                      "collection_access": {
+                        "app_access": {
+                          "access_roles": {
+                            "role": {
+                              "_eq": "X-Hasura-App-Role"
+                            }
+                          }
                         }
                       }
                     }
@@ -162,6 +234,23 @@
                 },
                 "limit": 100,
                 "allow_aggregations": true
+              }
+            }
+          ],
+          "object_relationships": [
+            {
+              "name": "collection_access",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "collections"
+                  },
+                  "column_mapping": {
+                    "collection_id": "id"
+                  },
+                  "insertion_order": null
+                }
               }
             }
           ]
@@ -249,12 +338,44 @@
                   "updated_at"
                 ],
                 "filter": {
-                  "tenant_id": {
-                    "_eq": "X-Hasura-Tenant-Id"
-                  }
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "collection_access": {
+                        "app_access": {
+                          "access_roles": {
+                            "role": {
+                              "_eq": "X-Hasura-App-Role"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
                 },
                 "limit": 100,
                 "allow_aggregations": true
+              }
+            }
+          ],
+          "object_relationships": [
+            {
+              "name": "collection_access",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "collections"
+                  },
+                  "column_mapping": {
+                    "collection_id": "id"
+                  },
+                  "insertion_order": null
+                }
               }
             }
           ]
@@ -279,6 +400,21 @@
                   }
                 }
               }
+            },
+            {
+              "name": "collection_access",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "collections"
+                  },
+                  "column_mapping": {
+                    "collection_id": "id"
+                  },
+                  "insertion_order": null
+                }
+              }
             }
           ],
           "select_permissions": [
@@ -289,15 +425,30 @@
                 "filter": {
                   "_and": [
                     {
-                      "tenant_id": {
-                        "_eq": "X-Hasura-Tenant-Id"
-                      }
+                      "_and": [
+                        {
+                          "tenant_id": {
+                            "_eq": "X-Hasura-Tenant-Id"
+                          }
+                        },
+                        {
+                          "field": {
+                            "permissions": {
+                              "role": {
+                                "_eq": "X-Hasura-App-Role"
+                              }
+                            }
+                          }
+                        }
+                      ]
                     },
                     {
-                      "field": {
-                        "permissions": {
-                          "role": {
-                            "_eq": "X-Hasura-App-Role"
+                      "collection_access": {
+                        "app_access": {
+                          "access_roles": {
+                            "role": {
+                              "_eq": "X-Hasura-App-Role"
+                            }
                           }
                         }
                       }
@@ -334,47 +485,81 @@
                 "filter": {
                   "_and": [
                     {
-                      "tenant_id": {
-                        "_eq": "X-Hasura-Tenant-Id"
-                      }
+                      "_and": [
+                        {
+                          "tenant_id": {
+                            "_eq": "X-Hasura-Tenant-Id"
+                          }
+                        },
+                        {
+                          "_or": [
+                            {
+                              "requested_by": {
+                                "_eq": "X-Hasura-User-Id"
+                              }
+                            },
+                            {
+                              "reviewer_role": {
+                                "_eq": "X-Hasura-App-Role"
+                              }
+                            },
+                            {
+                              "_exists": {
+                                "_table": {
+                                  "schema": "public",
+                                  "name": "memberships"
+                                },
+                                "_where": {
+                                  "tenant_id": {
+                                    "_eq": "X-Hasura-Tenant-Id"
+                                  },
+                                  "user_id": {
+                                    "_eq": "X-Hasura-User-Id"
+                                  },
+                                  "role": {
+                                    "_eq": "owner"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
                     },
                     {
-                      "_or": [
-                        {
-                          "requested_by": {
-                            "_eq": "X-Hasura-User-Id"
-                          }
-                        },
-                        {
-                          "reviewer_role": {
-                            "_eq": "X-Hasura-App-Role"
-                          }
-                        },
-                        {
-                          "_exists": {
-                            "_table": {
-                              "schema": "public",
-                              "name": "memberships"
-                            },
-                            "_where": {
-                              "tenant_id": {
-                                "_eq": "X-Hasura-Tenant-Id"
-                              },
-                              "user_id": {
-                                "_eq": "X-Hasura-User-Id"
-                              },
+                      "record_access": {
+                        "collection_access": {
+                          "app_access": {
+                            "access_roles": {
                               "role": {
-                                "_eq": "owner"
+                                "_eq": "X-Hasura-App-Role"
                               }
                             }
                           }
                         }
-                      ]
+                      }
                     }
                   ]
                 },
                 "limit": 100,
                 "allow_aggregations": true
+              }
+            }
+          ],
+          "object_relationships": [
+            {
+              "name": "record_access",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "records"
+                  },
+                  "column_mapping": {
+                    "record_id": "id"
+                  },
+                  "insertion_order": null
+                }
               }
             }
           ]
@@ -399,12 +584,46 @@
                   "created_at"
                 ],
                 "filter": {
-                  "tenant_id": {
-                    "_eq": "X-Hasura-Tenant-Id"
-                  }
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "record_access": {
+                        "collection_access": {
+                          "app_access": {
+                            "access_roles": {
+                              "role": {
+                                "_eq": "X-Hasura-App-Role"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
                 },
                 "limit": 100,
                 "allow_aggregations": true
+              }
+            }
+          ],
+          "object_relationships": [
+            {
+              "name": "record_access",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "records"
+                  },
+                  "column_mapping": {
+                    "record_id": "id"
+                  },
+                  "insertion_order": null
+                }
               }
             }
           ]
@@ -458,9 +677,26 @@
               "permission": {
                 "columns": ["id", "tenant_id", "record_id", "author", "body", "created_at"],
                 "filter": {
-                  "tenant_id": {
-                    "_eq": "X-Hasura-Tenant-Id"
-                  }
+                  "_and": [
+                    {
+                      "tenant_id": {
+                        "_eq": "X-Hasura-Tenant-Id"
+                      }
+                    },
+                    {
+                      "record_access": {
+                        "collection_access": {
+                          "app_access": {
+                            "access_roles": {
+                              "role": {
+                                "_eq": "X-Hasura-App-Role"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
                 },
                 "limit": 100,
                 "allow_aggregations": true
@@ -474,30 +710,47 @@
                 "check": {
                   "_and": [
                     {
-                      "tenant_id": {
-                        "_eq": "X-Hasura-Tenant-Id"
-                      }
-                    },
-                    {
-                      "author": {
-                        "_eq": "X-Hasura-User-Id"
-                      }
-                    },
-                    {
-                      "_exists": {
-                        "_table": {
-                          "schema": "public",
-                          "name": "memberships"
-                        },
-                        "_where": {
+                      "_and": [
+                        {
                           "tenant_id": {
                             "_eq": "X-Hasura-Tenant-Id"
-                          },
-                          "user_id": {
+                          }
+                        },
+                        {
+                          "author": {
                             "_eq": "X-Hasura-User-Id"
-                          },
-                          "role": {
-                            "_neq": "viewer"
+                          }
+                        },
+                        {
+                          "_exists": {
+                            "_table": {
+                              "schema": "public",
+                              "name": "memberships"
+                            },
+                            "_where": {
+                              "tenant_id": {
+                                "_eq": "X-Hasura-Tenant-Id"
+                              },
+                              "user_id": {
+                                "_eq": "X-Hasura-User-Id"
+                              },
+                              "role": {
+                                "_neq": "viewer"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "record_access": {
+                        "collection_access": {
+                          "app_access": {
+                            "access_roles": {
+                              "role": {
+                                "_eq": "X-Hasura-App-Role"
+                              }
+                            }
                           }
                         }
                       }
@@ -519,30 +772,47 @@
                 "filter": {
                   "_and": [
                     {
-                      "tenant_id": {
-                        "_eq": "X-Hasura-Tenant-Id"
-                      }
-                    },
-                    {
-                      "author": {
-                        "_eq": "X-Hasura-User-Id"
-                      }
-                    },
-                    {
-                      "_exists": {
-                        "_table": {
-                          "schema": "public",
-                          "name": "memberships"
-                        },
-                        "_where": {
+                      "_and": [
+                        {
                           "tenant_id": {
                             "_eq": "X-Hasura-Tenant-Id"
-                          },
-                          "user_id": {
+                          }
+                        },
+                        {
+                          "author": {
                             "_eq": "X-Hasura-User-Id"
-                          },
-                          "role": {
-                            "_neq": "viewer"
+                          }
+                        },
+                        {
+                          "_exists": {
+                            "_table": {
+                              "schema": "public",
+                              "name": "memberships"
+                            },
+                            "_where": {
+                              "tenant_id": {
+                                "_eq": "X-Hasura-Tenant-Id"
+                              },
+                              "user_id": {
+                                "_eq": "X-Hasura-User-Id"
+                              },
+                              "role": {
+                                "_neq": "viewer"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "record_access": {
+                        "collection_access": {
+                          "app_access": {
+                            "access_roles": {
+                              "role": {
+                                "_eq": "X-Hasura-App-Role"
+                              }
+                            }
                           }
                         }
                       }
@@ -552,30 +822,47 @@
                 "check": {
                   "_and": [
                     {
-                      "tenant_id": {
-                        "_eq": "X-Hasura-Tenant-Id"
-                      }
-                    },
-                    {
-                      "author": {
-                        "_eq": "X-Hasura-User-Id"
-                      }
-                    },
-                    {
-                      "_exists": {
-                        "_table": {
-                          "schema": "public",
-                          "name": "memberships"
-                        },
-                        "_where": {
+                      "_and": [
+                        {
                           "tenant_id": {
                             "_eq": "X-Hasura-Tenant-Id"
-                          },
-                          "user_id": {
+                          }
+                        },
+                        {
+                          "author": {
                             "_eq": "X-Hasura-User-Id"
-                          },
-                          "role": {
-                            "_neq": "viewer"
+                          }
+                        },
+                        {
+                          "_exists": {
+                            "_table": {
+                              "schema": "public",
+                              "name": "memberships"
+                            },
+                            "_where": {
+                              "tenant_id": {
+                                "_eq": "X-Hasura-Tenant-Id"
+                              },
+                              "user_id": {
+                                "_eq": "X-Hasura-User-Id"
+                              },
+                              "role": {
+                                "_neq": "viewer"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "record_access": {
+                        "collection_access": {
+                          "app_access": {
+                            "access_roles": {
+                              "role": {
+                                "_eq": "X-Hasura-App-Role"
+                              }
+                            }
                           }
                         }
                       }
@@ -593,35 +880,88 @@
                 "filter": {
                   "_and": [
                     {
-                      "tenant_id": {
-                        "_eq": "X-Hasura-Tenant-Id"
-                      }
-                    },
-                    {
-                      "author": {
-                        "_eq": "X-Hasura-User-Id"
-                      }
-                    },
-                    {
-                      "_exists": {
-                        "_table": {
-                          "schema": "public",
-                          "name": "memberships"
-                        },
-                        "_where": {
+                      "_and": [
+                        {
                           "tenant_id": {
                             "_eq": "X-Hasura-Tenant-Id"
-                          },
-                          "user_id": {
+                          }
+                        },
+                        {
+                          "author": {
                             "_eq": "X-Hasura-User-Id"
-                          },
-                          "role": {
-                            "_neq": "viewer"
+                          }
+                        },
+                        {
+                          "_exists": {
+                            "_table": {
+                              "schema": "public",
+                              "name": "memberships"
+                            },
+                            "_where": {
+                              "tenant_id": {
+                                "_eq": "X-Hasura-Tenant-Id"
+                              },
+                              "user_id": {
+                                "_eq": "X-Hasura-User-Id"
+                              },
+                              "role": {
+                                "_neq": "viewer"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "record_access": {
+                        "collection_access": {
+                          "app_access": {
+                            "access_roles": {
+                              "role": {
+                                "_eq": "X-Hasura-App-Role"
+                              }
+                            }
                           }
                         }
                       }
                     }
                   ]
+                }
+              }
+            }
+          ],
+          "object_relationships": [
+            {
+              "name": "record_access",
+              "using": {
+                "manual_configuration": {
+                  "remote_table": {
+                    "schema": "public",
+                    "name": "records"
+                  },
+                  "column_mapping": {
+                    "record_id": "id"
+                  },
+                  "insertion_order": null
+                }
+              }
+            }
+          ]
+        },
+        {
+          "table": {
+            "schema": "public",
+            "name": "app_roles"
+          },
+          "select_permissions": [
+            {
+              "role": "member",
+              "permission": {
+                "columns": ["tenant_id", "app_id", "role"],
+                "filter": {
+                  "tenant_id": {
+                    "_eq": "X-Hasura-Tenant-Id"
+                  }
                 }
               }
             }

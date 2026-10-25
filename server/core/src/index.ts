@@ -1,3 +1,5 @@
+import './builder/app-settings.js';
+import { legacyAccess } from './builder/legacy-access.js';
 import './builder/forms.js';
 import './builder/configuration.js';
 import './builder/records.js';
@@ -65,6 +67,7 @@ const run =
 const ctx = (q: Request) => context(q.headers.authorization, q.headers['x-tenant-id']);
 const id = (q: Request, key = 'id') => uuid.parse(q.params[key]);
 app.use('/api/builder', builder);
+app.use('/api', legacyAccess);
 app.get(
   '/health',
   run(async (_q, s) => {
@@ -261,8 +264,12 @@ app.get(
   run(async (q, s) => {
     const c = await ctx(q);
     s.json(
-      (await pool.query('SELECT * FROM apps WHERE tenant_id=$1 ORDER BY created_at', [c.tenant]))
-        .rows,
+      (
+        await pool.query(
+          'SELECT * FROM apps WHERE tenant_id=$1 AND EXISTS(SELECT 1 FROM app_roles ar WHERE ar.app_id=apps.id AND ar.role=$2) ORDER BY created_at',
+          [c.tenant, c.role],
+        )
+      ).rows,
     );
   }),
 );
@@ -294,9 +301,10 @@ app.get(
     const c = await ctx(q);
     s.json(
       (
-        await pool.query('SELECT * FROM collections WHERE tenant_id=$1 ORDER BY created_at', [
-          c.tenant,
-        ])
+        await pool.query(
+          'SELECT * FROM collections WHERE tenant_id=$1 AND EXISTS(SELECT 1 FROM app_roles ar WHERE ar.app_id=collections.app_id AND ar.role=$2) ORDER BY created_at',
+          [c.tenant, c.role],
+        )
       ).rows,
     );
   }),

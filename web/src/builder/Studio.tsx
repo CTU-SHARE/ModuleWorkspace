@@ -1,3 +1,4 @@
+import './AppSettings';
 import './Forms';
 import './Records';
 import './DefaultOptions';
