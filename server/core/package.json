@@ -20,7 +20,8 @@
     "zod": "^3.24.2",
     "multer": "^2.0.2",
     "@aws-sdk/client-s3": "^3.750.0",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
