@@ -1,3 +1,6 @@
+import { LazyPanel } from './LazyPanel';
+import { pageViews } from './Pages';
+import { collectionPanels, type PanelProps } from './registry';
 import { useState, type ComponentType } from 'react';
 import { recordUI, type RecordProps } from './Records';
 import { RecordForm } from './Forms';
@@ -59,12 +62,39 @@ export function Detail(p: RecordProps) {
           <p>
             {r.status} · {r.created_by}
           </p>
-          {p.fields.map((f) => (
-            <p key={f.key}>
-              <strong>{f.label}: </strong>
-              {displayValue(r.data[f.key])}
-            </p>
+          {(
+            p.collection!.config.form?.sections || [
+              { title: 'Thông tin', keys: p.fields.map((f) => f.key) },
+            ]
+          ).map((section: Row) => (
+            <section key={section.title}>
+              <h4>{section.title}</h4>
+              {section.keys.map((key: string) => {
+                const f = p.fields.find((f) => f.key === key);
+                return f ? (
+                  <p key={key}>
+                    <strong>{f.label}: </strong>
+                    {displayValue(r.data[key])}
+                  </p>
+                ) : null;
+              })}
+            </section>
           ))}
+          <LazyPanel title="Hồ sơ liên quan (hai chiều)">
+            <Related {...p} record={r} />
+          </LazyPanel>
+          {p.fields
+            .filter(
+              (f) =>
+                p.collection!.config.form?.sections &&
+                !p.collection!.config.form.sections.some((s: Row) => s.keys.includes(f.key)),
+            )
+            .map((f) => (
+              <p key={f.key}>
+                <strong>{f.label}: </strong>
+                {displayValue(r.data[f.key])}
+              </p>
+            ))}
           {p.role !== 'viewer' && <button onClick={() => setEdit(true)}>Chỉnh sửa</button>}
           {detailActions.map((Action, i) => (
             <Action
@@ -111,12 +141,6 @@ export function Detail(p: RecordProps) {
                     <button>Tải lên</button>
                   </AsyncForm>
                 )}
-              {p.fields.some((f) => f.type === 'file') && files.data?.length > 0 && (
-                <p>
-                  Mã tệp để gán vào trường File:{' '}
-                  {files.data.map((f: Row) => `${f.name}: ${f.id}`).join('; ')}
-                </p>
-              )}
             </>
           )}
           {p.app.config?.modules?.comments !== false && (
@@ -159,3 +183,103 @@ export function Detail(p: RecordProps) {
   );
 }
 recordUI.detail = Detail;
+
+function DetailBlock(p: PanelProps) {
+  const [id, setId] = useState(''),
+    [page, setPage] = useState(1),
+    [tick, setTick] = useState(0);
+  const rows = useLoad(
+    p.api,
+    `/api/builder/collections/${p.collection!.id}/records?page=${page}`,
+    tick,
+  );
+  const fields = useLoad(
+    p.api,
+    `/api/builder/collections/${p.collection!.id}/fields`,
+    p.collection!.version,
+  );
+  const record = rows.data?.items.find((r: Row) => r.id === id);
+  return (
+    <>
+      {(rows.error || fields.error) && <p role="alert">{rows.error || fields.error}</p>}
+      <label>
+        Hồ sơ
+        <select value={id} onChange={(e) => setId(e.target.value)}>
+          <option value="">Chọn hồ sơ</option>
+          {rows.data?.items.map((r: Row) => (
+            <option key={r.id} value={r.id}>
+              {r.title}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button
+        disabled={page === 1}
+        onClick={() => {
+          setPage((n) => n - 1);
+          setId('');
+        }}
+      >
+        Trước
+      </button>
+      <button
+        disabled={!rows.data || page * 30 >= rows.data.total}
+        onClick={() => {
+          setPage((n) => n + 1);
+          setId('');
+        }}
+      >
+        Sau
+      </button>
+      {record && fields.data && (
+        <Detail
+          key={record.id}
+          {...p}
+          fields={fields.data}
+          record={record}
+          close={() => setId('')}
+          saved={() => setTick((t) => t + 1)}
+        />
+      )}
+    </>
+  );
+}
+collectionPanels.push({ id: 'detail', name: 'Chi tiết hồ sơ', component: DetailBlock });
+pageViews.push('detail');
+
+function Related(p: RecordProps) {
+  const [page, setPage] = useState(1),
+    [selected, setSelected] = useState<Row | null>(null);
+  const related = useLoad(p.api, `/api/builder/records/${p.record!.id}/related?page=${page}`);
+  const fields = useLoad(
+    p.api,
+    selected ? `/api/builder/collections/${selected.collection_id}/fields` : null,
+  );
+  return (
+    <>
+      {(related.error || fields.error) && <p role="alert">{related.error || fields.error}</p>}
+      {related.data?.items.map((r: Row, i: number) => (
+        <p key={r.id + ':' + i}>
+          {r.direction === 'incoming' ? 'Liên kết đến đây' : 'Tham chiếu'} · {r.collection_name} ·{' '}
+          {r.field_label}: <button onClick={() => setSelected(r)}>{r.title}</button>
+        </p>
+      ))}
+      <button disabled={page === 1} onClick={() => setPage((n) => n - 1)}>
+        Trước
+      </button>
+      <button disabled={!related.data?.hasMore} onClick={() => setPage((n) => n + 1)}>
+        Sau
+      </button>
+      {selected && fields.data && (
+        <Detail
+          {...p}
+          collection={selected.collection}
+          fields={fields.data}
+          record={selected}
+          close={() => setSelected(null)}
+          saved={() => setSelected(null)}
+        />
+      )}
+    </>
+  );
+}

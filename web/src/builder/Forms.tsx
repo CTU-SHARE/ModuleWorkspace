@@ -88,6 +88,7 @@ export function RecordForm(p: RecordProps) {
                   {f.label}
                   {f.required ? ' *' : ''}
                   <ValueInput
+                    api={p.api}
                     field={f}
                     value={values[key]}
                     disabled={!editable || !f.can_write || !!f.config?.formula}

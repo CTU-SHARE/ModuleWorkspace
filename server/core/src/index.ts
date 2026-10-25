@@ -1,3 +1,4 @@
+import './builder/relations.js';
 import './builder/actions.js';
 import './builder/conditions.js';
 import './builder/details.js';

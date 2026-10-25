@@ -1,3 +1,4 @@
+import './Relations';
 import './Actions';
 import './Visibility';
 import './Details';
