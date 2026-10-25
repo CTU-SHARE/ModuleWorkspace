@@ -1,3 +1,4 @@
+import './Modules';
 import './Menus';
 import './Pages';
 import './AppSettings';
@@ -6,7 +7,7 @@ import './Records';
 import './DefaultOptions';
 import './ValidationOptions';
 import './Fields';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Collections } from './Collections';
 import { AppList } from './AppList';
 import { AsyncForm } from '../components/AsyncForm';
@@ -15,6 +16,18 @@ import { appPanels, appTools, collectionPanels, type Row } from './registry';
 export function Studio({ api, role, user }: { api: API; role: string; user: string }) {
   const [app, setApp] = useState<Row | null>(null),
     [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!app) return;
+    let alive = true;
+    api('/api/builder/apps/' + app.id)
+      .then((a) => {
+        if (alive) setApp(a);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [api, app?.id, tick]);
   const admin = ['owner', 'admin'].includes(role);
   const refresh = () => setTick((t) => t + 1);
   return (
@@ -66,7 +79,11 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
         <>
           <h3>{app.name}</h3>
           {appPanels
-            .filter((x) => !x.adminOnly || admin)
+            .filter(
+              (x) =>
+                (!x.adminOnly || admin) &&
+                (!['pages', 'menu'].includes(x.id) || app.config.modules?.pages !== false),
+            )
             .map(({ id, name, component: Component }) => (
               <details key={id}>
                 <summary>{name}</summary>
@@ -81,16 +98,18 @@ export function Studio({ api, role, user }: { api: API; role: string; user: stri
                 />
               </details>
             ))}
-          <Collections
-            key={app.id}
-            api={api}
-            app={app}
-            fields={[]}
-            admin={admin}
-            role={role}
-            user={user}
-            refresh={refresh}
-          />
+          {app.config.modules?.records !== false && (
+            <Collections
+              key={app.id}
+              api={api}
+              app={app}
+              fields={[]}
+              admin={admin}
+              role={role}
+              user={user}
+              refresh={refresh}
+            />
+          )}
         </>
       )}
     </section>

@@ -1,3 +1,4 @@
+import './builder/modules.js';
 import './builder/menus.js';
 import './builder/pages.js';
 import './builder/app-settings.js';

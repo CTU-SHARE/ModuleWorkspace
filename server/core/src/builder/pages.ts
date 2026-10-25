@@ -43,7 +43,7 @@ export async function checkPage(c: Context, appId: string, config: unknown, db: 
   const b = pageConfig.parse(config);
   for (const block of b.blocks) {
     const found = await db.query(
-      'SELECT id FROM collections WHERE tenant_id=$1 AND app_id=$2 AND id=$3',
+      'SELECT id FROM collections WHERE tenant_id=$1 AND app_id=$2 AND id=$3 AND archived_at IS NULL',
       [c.tenant, appId, block.collection_id],
     );
     if (!found.rowCount) fail(400, 'Block tham chiếu bảng ngoài ứng dụng');
@@ -53,7 +53,8 @@ export async function checkPage(c: Context, appId: string, config: unknown, db: 
 builder.get(
   '/apps/:id/pages',
   route(async (q, s, c) => {
-    await application(c, String(q.params.id));
+    const app = await application(c, String(q.params.id));
+    if (app.config.modules?.pages === false) fail(403, 'Module trang đã tắt');
     const rows = (
       await pool.query(
         'SELECT * FROM app_pages WHERE tenant_id=$1 AND app_id=$2 ORDER BY created_at,id',
