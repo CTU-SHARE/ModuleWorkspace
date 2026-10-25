@@ -4,7 +4,12 @@ import { Filters, type Filter } from './Filters';
 import { displayValue } from './ValueInput';
 import { collectionPanels, type PanelProps, type Row } from './registry';
 import { AsyncForm } from '../components/AsyncForm';
-export type RecordProps = PanelProps & { record: Row | null; close: () => void; saved: () => void };
+export type RecordProps = PanelProps & {
+  record: Row | null;
+  initialValues?: Row;
+  close: () => void;
+  saved: () => void;
+};
 export const recordUI: {
   editor?: ComponentType<RecordProps>;
   detail?: ComponentType<RecordProps>;
@@ -20,8 +25,8 @@ export function Records(p: PanelProps) {
     [page, setPage] = useState(1),
     [sort, setSort] = useState(col.config.table?.sort || 'created_at'),
     [direction, setDirection] = useState(col.config.table?.direction || 'desc');
-  const [filters, setFilters] = useState<Filter[]>([]),
-    [mode, setMode] = useState('and'),
+  const [filters, setFilters] = useState<Filter[]>(col.config.table?.filters || []),
+    [mode, setMode] = useState(col.config.table?.mode || 'and'),
     [selected, setSelected] = useState<Row | null | undefined>(),
     [tick, setTick] = useState(0);
   useEffect(() => {
@@ -118,7 +123,10 @@ export function Records(p: PanelProps) {
             submit={async (f) => {
               await p.api(`/api/builder/collections/${col.id}/config`, 'PUT', {
                 version: col.version,
-                config: { ...col.config, table: { columns: f.getAll('columns'), sort, direction } },
+                config: {
+                  ...col.config,
+                  table: { columns: f.getAll('columns'), sort, direction, filters, mode },
+                },
               });
               p.refresh();
             }}

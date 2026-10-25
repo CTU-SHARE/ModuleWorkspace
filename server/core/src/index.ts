@@ -1,3 +1,4 @@
+import './builder/calendar.js';
 import './builder/views.js';
 import './builder/templates.js';
 import './builder/cloning.js';

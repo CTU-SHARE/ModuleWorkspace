@@ -1,3 +1,4 @@
+import './Calendar';
 import './Kanban';
 import './Templates';
 import './Cloning';

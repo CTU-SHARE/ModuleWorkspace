@@ -1,3 +1,5 @@
+import { ApiError } from '../lib/api';
+import { pageViews } from './Pages';
 import { useState, type ComponentType } from 'react';
 import { AsyncForm } from '../components/AsyncForm';
 import { ValueInput, formValues } from './ValueInput';
@@ -15,13 +17,16 @@ export const formPlugins: ComponentType<{
 }>[] = [];
 export function RecordForm(p: RecordProps) {
   const [values, setValues] = useState<Row>(() => ({
-    ...Object.fromEntries(
-      p.fields
-        .filter((f) => Object.hasOwn(f.config || {}, 'default'))
-        .map((f) => [f.key, f.config.default]),
-    ),
-    ...(p.record?.data || {}),
+    ...(p.record
+      ? {}
+      : Object.fromEntries(
+          p.fields
+            .filter((f) => Object.hasOwn(f.config || {}, 'default'))
+            .map((f) => [f.key, f.config.default]),
+        )),
+    ...(p.record?.data || p.initialValues || {}),
   }));
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const editable =
     p.role !== 'viewer' &&
     (!p.record ||
@@ -44,18 +49,24 @@ export function RecordForm(p: RecordProps) {
       <AsyncForm
         submit={async (f) => {
           if (!editable) throw Error('Không có quyền chỉnh sửa');
-          const data = formValues(
-            p.fields.filter((f) => !f.config?.formula),
-            values,
-          );
-          await p.api(
-            p.record
-              ? `/api/builder/records/${p.record.id}`
-              : `/api/builder/collections/${p.collection!.id}/records`,
-            p.record ? 'PATCH' : 'POST',
-            { title: f.get('title'), data, version: p.record?.version },
-          );
-          p.saved();
+          setFieldErrors({});
+          try {
+            const data = formValues(
+              p.fields.filter((f) => !f.config?.formula),
+              values,
+            );
+            await p.api(
+              p.record
+                ? `/api/builder/records/${p.record.id}`
+                : `/api/builder/collections/${p.collection!.id}/records`,
+              p.record ? 'PATCH' : 'POST',
+              { title: f.get('title'), data, version: p.record?.version },
+            );
+            p.saved();
+          } catch (e) {
+            if (e instanceof ApiError) setFieldErrors(e.fieldErrors);
+            throw e;
+          }
         }}
       >
         <label>
@@ -90,11 +101,17 @@ export function RecordForm(p: RecordProps) {
                   {f.required ? ' *' : ''}
                   <ValueInput
                     api={p.api}
+                    recordId={p.record?.id}
                     field={formField.resolve(f, values)}
                     value={values[key]}
                     disabled={!editable || !f.can_write || !!f.config?.formula}
                     change={(v) => setValues((old) => ({ ...old, [key]: v }))}
                   />
+                  {fieldErrors[key]?.map((message) => (
+                    <small key={message} role="alert">
+                      {message}
+                    </small>
+                  ))}
                 </label>
               );
             })}
@@ -188,8 +205,39 @@ function FormDesigner(p: PanelProps) {
 }
 recordUI.editor = RecordForm;
 collectionPanels.push({
-  id: 'form',
+  id: 'form-designer',
   name: 'Thiết kế biểu mẫu',
   component: FormDesigner,
   adminOnly: true,
 });
+
+function FormBlock(p: PanelProps) {
+  const [saved, setSaved] = useState(0);
+  const { data, error } = useLoad(
+    p.api,
+    `/api/builder/collections/${p.collection!.id}/fields`,
+    p.collection!.version,
+  );
+  if (p.role === 'viewer') return <p>Biểu mẫu này cần quyền tạo hồ sơ.</p>;
+  return (
+    <>
+      {error && <p role="alert">{error}</p>}
+      {saved > 0 && <p role="status">Đã tạo hồ sơ.</p>}
+      {data && (
+        <RecordForm
+          key={saved}
+          {...p}
+          fields={data}
+          record={null}
+          close={() => setSaved((n) => n + 1)}
+          saved={() => {
+            setSaved((n) => n + 1);
+            p.refresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+collectionPanels.push({ id: 'form', name: 'Biểu mẫu nhập liệu', component: FormBlock });
+pageViews.push('form');
