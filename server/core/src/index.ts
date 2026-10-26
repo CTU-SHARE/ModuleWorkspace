@@ -26,7 +26,7 @@ import './builder/records.js';
 import './builder/defaults.js';
 import './builder/validation.js';
 import './builder/file-fields.js';
-import { loadRecord, saveRecord, recordInput } from './builder/records-service.js';
+import { loadRecord, saveRecord, recordInput, validateValue } from './builder/records-service.js';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import helmet from 'helmet';
 import multer from 'multer';
@@ -511,6 +511,71 @@ app.patch(
     s.json(await saveRecord(c, r.collection_id, recordInput.parse(q.body), r.id));
   }),
 );
+// Buyer-only transition: approved recommendations retain their immutable request/approval.
+const purchaseKeys = ['nha_cung_cap', 'tinh_trang_mua', 'so_hoa_don', 'tong_tien_thuc_te', 'ngay_nhan', 'ghi_chu_doi_chieu'] as const;
+const purchaseInput = z.object({
+  version: z.number().int().positive(),
+  data: z.object({
+    nha_cung_cap: z.string().max(500).nullable().optional(),
+    tinh_trang_mua: z.enum(['Chưa mua', 'Đang báo giá', 'Đã đặt hàng', 'Đã nhận hàng']).nullable().optional(),
+    so_hoa_don: z.string().max(500).nullable().optional(),
+    tong_tien_thuc_te: z.number().finite().nonnegative().nullable().optional(),
+    ngay_nhan: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    ghi_chu_doi_chieu: z.string().max(10000).nullable().optional(),
+  }).strict(),
+}).strict();
+app.patch('/api/purchases/:id', run(async (q, s) => {
+  const c = await ctx(q);
+  // Owner may intervene; other users must have explicit custom buyer permission.
+  if (c.role !== 'owner' && !c.customRole?.permissions.includes('purchases.update'))
+    fail(403, 'Chỉ nhân viên mua hàng được cập nhật');
+  const b = purchaseInput.parse(q.body);
+  const result = await tx(async (db) => {
+    const r = (await db.query(
+      'SELECT * FROM records WHERE tenant_id=$1 AND id=$2 FOR UPDATE', [c.tenant, id(q)]
+    )).rows[0];
+    if (!r) fail(404, 'Không tìm thấy hồ sơ');
+    await authorizedCollection(c, r.collection_id, db);
+    if (r.status !== 'approved') fail(409, 'Chỉ cập nhật mua hàng sau khi duyệt');
+    if (r.version !== b.version) fail(409, 'Hồ sơ đã thay đổi; tải lại trước khi lưu');
+    if (Object.keys(b.data).length === 0) fail(400, 'Cần ít nhất một trường cập nhật');
+    const fields = (await db.query(
+      'SELECT f.*,p.can_write FROM fields f JOIN field_permissions p ON p.field_id=f.id AND p.role=$3 WHERE f.tenant_id=$1 AND f.collection_id=$2 AND f.archived_at IS NULL AND f.key=ANY($4::text[])',
+      [c.tenant, r.collection_id, c.role, purchaseKeys]
+    )).rows;
+    for (const [key, value] of Object.entries(b.data)) {
+      const f = fields.find(x => x.key === key);
+      if (!f || !f.can_write || f.config?.formula) fail(403, 'Không được sửa trường ' + key);
+      // Run normal field validators without allowing arbitrary keys.
+      validateValue(f, value);
+    }
+    const old = (await db.query(
+      'SELECT f.key,v.value FROM record_values v JOIN fields f ON f.id=v.field_id WHERE v.tenant_id=$1 AND v.record_id=$2 AND f.key=ANY($3::text[])',
+      [c.tenant, r.id, purchaseKeys]
+    )).rows;
+    const merged = {...Object.fromEntries(old.map(x => [x.key,x.value])), ...b.data};
+    if (merged.tinh_trang_mua === 'Đã nhận hàng') {
+      if (!merged.nha_cung_cap || !merged.so_hoa_don ||
+          merged.tong_tien_thuc_te == null || !merged.ngay_nhan)
+        fail(400, 'Đã nhận hàng cần nhà cung cấp, hóa đơn, tổng chi và ngày nhận');
+    }
+    for (const [key, value] of Object.entries(b.data)) {
+      const f = fields.find(x => x.key === key)!;
+      await db.query(
+        'INSERT INTO record_values(tenant_id,collection_id,record_id,field_id,value) VALUES($1,$2,$3,$4,$5) ON CONFLICT(record_id,field_id) DO UPDATE SET value=excluded.value',
+        [c.tenant, r.collection_id, r.id, f.id, JSON.stringify(validateValue(f, value))]
+      );
+    }
+    const updated = (await db.query(
+      'UPDATE records SET version=version+1,updated_at=now() WHERE tenant_id=$1 AND id=$2 RETURNING *',
+      [c.tenant, r.id]
+    )).rows[0];
+    await audit(db, c.tenant, c.user, 'purchase.update', r.id, {keys:Object.keys(b.data)});
+    await event(db, c.tenant, c.user, 'record.updated', r.id);
+    return updated;
+  });
+  s.json(result);
+}));
 app.delete(
   '/api/records/:id',
   run(async (q, s) => {
@@ -571,6 +636,7 @@ app.post(
           )
         ).rows[0];
         if (!r) fail(404, 'Không tìm thấy hồ sơ');
+        await authorizedCollection(c, r.collection_id, db);
         if (c.role === 'editor' && r.created_by !== c.user) fail(403, 'Chỉ gửi hồ sơ của mình');
         if (!r.workflow_enabled) fail(400, 'Bảng chưa bật quy trình');
         if (!['draft', 'rejected'].includes(r.status))
@@ -645,6 +711,9 @@ app.post(
           ])
         ).rows[0];
         if (!a) fail(404, 'Không tìm thấy yêu cầu');
+        const target = (await db.query('SELECT collection_id FROM records WHERE tenant_id=$1 AND id=$2', [c.tenant,a.record_id])).rows[0];
+        if (!target) fail(404, 'Không tìm thấy hồ sơ');
+        await authorizedCollection(c, target.collection_id, db);
         if (a.status !== 'pending') fail(409, 'Yêu cầu đã xử lý');
         if (a.requested_by === c.user) fail(403, 'Không được tự phê duyệt');
         if (c.role !== 'owner' && c.role !== a.reviewer_role)

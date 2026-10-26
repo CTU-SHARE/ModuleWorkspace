@@ -11,6 +11,7 @@ export const permissionCatalog = [
   { key: 'records.create', label: 'Tạo hồ sơ', level: 'editor' },
   { key: 'records.update', label: 'Sửa hồ sơ theo quyền nền', level: 'editor' },
   { key: 'records.delete', label: 'Xóa hồ sơ nháp theo quyền nền', level: 'editor' },
+  { key: 'purchases.update', label: 'Cập nhật mua hàng sau phê duyệt', level: 'editor' },
   { key: 'records.complete', label: 'Thực hiện hành động hoàn thành', level: 'editor' },
   { key: 'data.import', label: 'Nhập hồ sơ CSV/Excel', level: 'editor' },
   { key: 'data.export', label: 'Xuất hồ sơ CSV/Excel', level: 'viewer' },
@@ -42,6 +43,7 @@ export const dependencies: Partial<Record<Permission, Permission[]>> = {
   'templates.install': ['apps.manage'], 'collections.manage': ['collections.read'],
   'fields.manage': ['collections.manage'],
   'records.create': ['records.read'], 'records.update': ['records.read'],
+  'purchases.update': ['records.read'],
   'records.delete': ['records.read'], 'records.complete': ['records.update'],
   'data.import': ['records.create'], 'data.export': ['records.read'],
   'files.read': ['records.read'], 'files.upload': ['files.read', 'records.update'],
@@ -70,6 +72,7 @@ export function routePermissions(method: string, path: string): Permission[] | n
   if (get && p === '/audit') return ['audit.read'];
   if (get && p === '/operations') return ['operations.read'];
   if (method === 'POST' && /^\/operations\/[^/]+\/retry$/.test(p)) return ['operations.retry'];
+  if (method === 'PATCH' && /^\/purchases\/[^/]+$/.test(p)) return ['purchases.update'];
   if (get && p === '/approvals') return ['approvals.read'];
   if (method === 'POST' && /^\/approvals\/[^/]+\/decide$/.test(p)) return ['approvals.decide'];
   if (method === 'POST' && /^\/records\/[^/]+\/submit$/.test(p)) return ['approvals.submit'];

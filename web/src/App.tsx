@@ -1382,7 +1382,7 @@ function Workspace({ config }: { config: Config }) {
               canWrite &&
               (org?.role !== "editor" ||
                 !editing ||
-                editing.created_by === me?.user)
+                editing.created_by === me?.user || (editing.status === "approved" && can("purchases.update")))
             }
             collection={selected}
             busy={busy}
@@ -1519,6 +1519,8 @@ function RecordModal({
   const [files, setFiles] = useState<Row[]>([]),
     [comments, setComments] = useState<Row[]>([]),
     [localError, setLocalError] = useState("");
+  const purchaseFields = new Set(['nha_cung_cap', 'tinh_trang_mua', 'so_hoa_don', 'tong_tien_thuc_te', 'ngay_nhan', 'ghi_chu_doi_chieu']);
+  const purchaseEditable = !!record && record.status === 'approved' && can('purchases.update') && canWrite;
   const editable =
     can(record ? "records.update" : "records.create") && canWrite && (!record || ["draft", "rejected"].includes(record.status));
   const recordId = record?.id as string | undefined;
@@ -1562,7 +1564,7 @@ function RecordModal({
           e.preventDefault();
           const f = new FormData(e.currentTarget);
           const data: Row = {};
-          for (const field of fields.filter((x) => x.can_write)) {
+          for (const field of fields.filter((x) => x.can_write && (!purchaseEditable || purchaseFields.has(x.key)))) {
             const value = f.get(field.key);
             data[field.key] =
               field.type === "boolean"
@@ -1575,11 +1577,11 @@ function RecordModal({
           }
           void act(async () => {
             const r = await api(
-              record
+              purchaseEditable ? "/api/purchases/" + record!.id : record
                 ? "/api/records/" + record.id
                 : "/api/collections/" + collection.id + "/records",
               record ? "PATCH" : "POST",
-              { title: f.get("_title"), data, version: record?.version },
+              purchaseEditable ? { data, version: record!.version } : { title: f.get("_title"), data, version: record?.version },
             );
             saved(await api("/api/records/" + r.id));
           });
@@ -1604,14 +1606,14 @@ function RecordModal({
               <textarea
                 name={f.key}
                 defaultValue={record?.data[f.key] || ""}
-                disabled={!editable || !f.can_write}
+                disabled={!f.can_write || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
                 required={f.required}
               />
             ) : f.type === "select" ? (
               <select
                 name={f.key}
                 defaultValue={record?.data[f.key] || ""}
-                disabled={!editable || !f.can_write}
+                disabled={!f.can_write || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
                 required={f.required}
               >
                 <option value="">Chọn giá trị</option>
@@ -1626,7 +1628,7 @@ function RecordModal({
                 name={f.key}
                 type="checkbox"
                 defaultChecked={record?.data[f.key] || false}
-                disabled={!editable || !f.can_write}
+                disabled={!f.can_write || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
               />
             ) : (
               <input
@@ -1640,16 +1642,16 @@ function RecordModal({
                 }
                 step={f.type === "number" ? "any" : undefined}
                 defaultValue={record?.data[f.key] ?? ""}
-                disabled={!editable || !f.can_write}
+                disabled={!f.can_write || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
                 required={f.required}
               />
             )}
           </label>
         ))}
         <div className="actions">
-          {editable && (
+          {(editable || purchaseEditable) && (
             <button className="primary" disabled={busy}>
-              Lưu hồ sơ
+              {purchaseEditable ? 'Cập nhật mua hàng' : 'Lưu hồ sơ'}
             </button>
           )}
           {record && editable && can("approvals.submit") && collection.workflow_enabled && (
