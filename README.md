@@ -20,7 +20,7 @@ Module Workspace là nền tảng quản lý hồ sơ và công việc cho tổ 
 - [Công nghệ sử dụng](#công-nghệ-sử-dụng)
 - [Cấu trúc dự án](#cấu-trúc-dự-án)
 - [Hướng dẫn cài đặt](#hướng-dẫn-cài-đặt)
-- [Sử dụng mẫu Văn phòng số](#sử-dụng-mẫu-văn-phòng-số)
+- [Sử dụng mẫu ứng dụng](#sử-dụng-mẫu-ứng-dụng)
 - [Phân quyền và dữ liệu](#phân-quyền-và-dữ-liệu)
 - [API nghiệp vụ](#api-nghiệp-vụ)
 - [Vận hành và triển khai](#vận-hành-và-triển-khai)
@@ -55,10 +55,12 @@ Mỗi tổ chức quản lý dữ liệu và thành viên của mình. Một tà
 ### Ứng dụng và dữ liệu
 
 - Tạo ứng dụng và các bảng dữ liệu theo nhu cầu của tổ chức.
-- Thiết kế biểu mẫu với trường văn bản, số, ngày, boolean và danh sách lựa chọn.
-- Thiết lập trường bắt buộc, quyền đọc và quyền ghi.
+- Thiết kế biểu mẫu với trường văn bản ngắn/dài, số, ngày, boolean, danh sách lựa chọn, JSON, tệp và quan hệ.
+- Thiết lập trường bắt buộc, giá trị mặc định, validation, công thức, liên kết dữ liệu, điều kiện hiển thị, quyền đọc và quyền ghi.
 - Tạo, sửa, xóa hồ sơ nháp; tìm kiếm, lọc trạng thái và phân trang.
 - Kiểm tra phiên bản hồ sơ khi lưu để tránh ghi đè thay đổi của người khác.
+- Hiển thị dữ liệu bằng bảng, lịch, Kanban, Gantt, cây dữ liệu và dashboard.
+- Nhập/xuất CSV, Excel; nhân bản, xuất và nhập gói cấu hình ứng dụng.
 
 ### Hồ sơ và phê duyệt
 
@@ -66,12 +68,12 @@ Mỗi tổ chức quản lý dữ liệu và thành viên của mình. Một tà
 - Trao đổi bằng bình luận trên hồ sơ.
 - Gửi duyệt và xử lý yêu cầu theo quy trình một cấp.
 - Cho phép sửa, gửi lại hồ sơ bị từ chối; không cho phép tự phê duyệt.
-- Tạo ứng dụng từ mẫu Văn phòng số với nghiệp vụ đề nghị mua sắm.
+- Cài ứng dụng từ mẫu **Quản lý trường học** hoặc **Quản lý nghỉ phép**.
 
 ### Quản lý tổ chức
 
 - Đăng nhập tập trung qua Logto.
-- Quản lý thành viên với bốn vai trò: `owner`, `admin`, `editor` và `viewer`.
+- Quản lý thành viên với bốn vai trò nền: `owner`, `admin`, `editor`, `viewer` và vai trò tùy chỉnh theo tổ chức.
 - Theo dõi thống kê, nhật ký hoạt động và thông báo cá nhân.
 - Cập nhật giao diện qua WebSocket khi có sự kiện mới.
 
@@ -79,21 +81,34 @@ Mỗi tổ chức quản lý dữ liệu và thành viên của mình. Một tà
 
 Hệ thống gồm giao diện web và các dịch vụ phía server. Người dùng truy cập qua APISIX; các dịch vụ dữ liệu, xác thực, lưu trữ và xử lý workflow chạy trong mạng Docker nội bộ.
 
+<p align="center">
+  <img src="docs/system-architecture.png" alt="Sơ đồ kiến trúc hệ thống Module Workspace" width="100%">
+</p>
+
+Request đầu tiên tới domain ứng dụng đi vào APISIX. Route web `/*` được chuyển tới Nginx để trả HTML, JavaScript, CSS và `config.json`; React sau đó chạy trong trình duyệt. Cùng gateway định tuyến `/api/*` tới Express Core, `/v1/graphql` tới Hasura, `/connection/websocket` tới Centrifugo và domain xác thực tới Logto.
+
+Luồng định tuyến và sự kiện thực tế:
+
 ```mermaid
-flowchart TD
-    Web["React Web"] --> Gateway["APISIX"]
-    Gateway --> Logto["Logto"]
-    Gateway --> Core["Express Core API"]
-    Gateway --> Hasura["Hasura GraphQL"]
-    Gateway --> Realtime["Centrifugo"]
-    Core --> DB["PostgreSQL"]
+flowchart LR
+    Browser["Browser / React"] -->|HTTP, GraphQL, WebSocket| Gateway["APISIX"]
+    Gateway -->|/*| Nginx["Nginx"]
+    Nginx -->|HTML, JS, CSS| Browser
+    Gateway -->|auth domain| Logto["Logto"]
+    Gateway -->|/api/*| Core["Express Core API"]
+    Gateway -->|/v1/graphql| Hasura["Hasura GraphQL"]
+    Gateway -->|/connection/websocket| Realtime["Centrifugo"]
+    Core -->|business data + outbox| DB["PostgreSQL"]
     Hasura --> DB
     Core --> Files["MinIO"]
-    Worker["Worker"] --> DB
-    Worker --> Workflow["n8n"]
+    DB -->|poll outbox| Worker["Outbox Worker"]
+    Worker -->|event_id| Workflow["n8n"]
+    Workflow -->|internal callback| Core
+    Core -->|publish refresh| Realtime
+    Realtime -->|WebSocket| Browser
 ```
 
-Express xử lý các nghiệp vụ như phân quyền, kiểm tra dữ liệu, phê duyệt và truy cập tệp. Hasura cung cấp GraphQL để đọc dữ liệu theo quyền và thao tác với bình luận. Worker đọc sự kiện từ outbox để chuyển sang quy trình xử lý bất đồng bộ.
+Express xử lý phân quyền, kiểm tra dữ liệu, phê duyệt và truy cập tệp. Hasura cung cấp GraphQL để đọc dữ liệu theo quyền và thao tác với bình luận. Core ghi dữ liệu nghiệp vụ và sự kiện outbox trong cùng transaction; Worker đọc outbox, gọi n8n, rồi n8n gọi lại endpoint nội bộ của Core. Core tạo thông báo và phát tín hiệu refresh qua Centrifugo; n8n không truy cập trực tiếp PostgreSQL hoặc MinIO.
 
 Gateway kết nối thêm mạng `edge`; mặc định chỉ mở cổng trên loopback. Các cổng quản trị được mở riêng bằng `compose.admin.yaml` khi cấu hình hoặc bảo trì.
 
@@ -108,8 +123,9 @@ Gateway kết nối thêm mạng `edge`; mặc định chỉ mở cổng trên l
 | Cơ sở dữ liệu | PostgreSQL | Lưu cấu hình, hồ sơ và sự kiện |
 | GraphQL | Hasura | Truy vấn dữ liệu với quyền truy cập |
 | Lưu trữ tệp | MinIO | Lưu tài liệu trong bucket riêng tư |
-| Workflow | n8n | Xử lý quy trình và thông báo bất đồng bộ |
-| Thời gian thực | Centrifugo | Chuyển thông báo qua WebSocket |
+| Xử lý bất đồng bộ | Node.js, TypeScript | Worker đọc và retry sự kiện trong transactional outbox |
+| Workflow | n8n | Điều phối việc giao sự kiện và gọi lại Core |
+| Thời gian thực | Centrifugo | Phát tín hiệu refresh qua WebSocket |
 | Triển khai | Docker Compose | Cấu hình và chạy các dịch vụ |
 
 ## Cấu trúc dự án
@@ -136,7 +152,7 @@ Gateway kết nối thêm mạng `edge`; mặc định chỉ mở cổng trên l
 
 Cần Docker Engine, Docker Compose 2.24.4 trở lên và Python 3.10 trở lên. Khi chạy chế độ phát triển, cài thêm Node.js 22 và npm. Khuyến nghị máy có ít nhất 8 GB RAM và kết nối Internet để tải image, dependency.
 
-Tên miền local: `localhost` cho app và `auth.localhost` cho Logto. Nếu hệ điều hành không tự resolve `auth.localhost`, thêm vào `/etc/hosts`:
+Tên miền local: `localhost` cho app và `auth.localhost` cho Logto. Nếu hệ điều hành không tự resolve `auth.localhost`, thêm vào `/etc/hosts` trên Linux/macOS hoặc `C:\Windows\System32\drivers\etc\hosts` trên Windows (cần quyền Administrator):
 
 ```text
 127.0.0.1 auth.localhost
@@ -151,6 +167,8 @@ cd server
 python3 scripts/configure.py
 docker compose -f compose.yaml -f compose.admin.yaml up -d --build
 ```
+
+Trên Windows PowerShell, dùng `python scripts\configure.py` nếu lệnh `python3` không tồn tại. Các file shell phải dùng line ending LF; `.gitattributes` trong repository giữ quy tắc này khi checkout trên Windows.
 
 Script tạo `.env` từ `.env.example`, sinh các khóa bí mật và giữ nguyên giá trị đã cấu hình. Không đưa `.env`, `core/.env`, `generated/` hoặc bản sao lưu dữ liệu lên Git.
 
@@ -168,6 +186,17 @@ python3 scripts/configure.py
 sh scripts/bootstrap.sh prod
 docker compose -f compose.yaml -f compose.admin.yaml restart web gateway
 ```
+
+Trên Windows PowerShell với Git Bash:
+
+```powershell
+python scripts\configure.py
+$env:MSYS_NO_PATHCONV = '1'
+& 'C:\Program Files\Git\bin\bash.exe' scripts/bootstrap.sh prod
+docker compose -f compose.yaml -f compose.admin.yaml restart web gateway
+```
+
+`MSYS_NO_PATHCONV` ngăn Git Bash đổi đường dẫn container `/imports/...` thành đường dẫn Windows khi import workflow n8n.
 
 Bootstrap áp dụng Hasura metadata, import/publish workflow và restart n8n. Nếu n8n chưa chạy xong migration, chờ log khởi động xong rồi chạy lại bootstrap; dữ liệu nghiệp vụ không bị xóa.
 
@@ -247,15 +276,15 @@ Không chạy `docker compose down -v` nếu muốn giữ dữ liệu. Dùng cù
 Identifier `https://api.module-workspace.local` trong cấu hình Logto là định danh API, không phải địa chỉ web cần truy cập. Giá trị này phải khớp với cấu hình resource của frontend và backend.
 
 
-## Sử dụng mẫu Văn phòng số
+## Sử dụng mẫu ứng dụng
 
-1. Đăng nhập người A, tạo tổ chức “Công ty Bình Minh”. A tự trở thành owner của tổ chức đó.
-2. Mở Ứng dụng → **Dùng mẫu Văn phòng số**. Bảng Đề nghị mua sắm có tên hàng hóa, dự toán, lý do và ngày cần; workflow bật sẵn.
-3. Đăng nhập người B bằng cửa sổ riêng. B vào Thành viên để lấy subject (nếu chưa có tổ chức, subject hiển thị ở chân menu). A thêm B với role editor.
+1. Đăng nhập người A, tạo một tổ chức. A tự trở thành owner của tổ chức đó.
+2. Trong thư viện mẫu, chọn **Quản lý trường học** hoặc **Quản lý nghỉ phép**. Mẫu trường học tạo sáu bảng có quan hệ, công thức điểm, đơn nghỉ học, lịch, Kanban và Gantt; mẫu nghỉ phép tạo bảng đơn có quy trình duyệt.
+3. Đăng nhập người B bằng cửa sổ riêng. A thêm subject của B vào tổ chức với vai trò editor hoặc một vai trò tùy chỉnh phù hợp.
 4. B chọn tổ chức, tạo hồ sơ, nhập dữ liệu, đính kèm tệp rồi gửi duyệt.
-5. A nhận thông báo, mở Trung tâm phê duyệt, bấm tên hồ sơ để xem nội dung/tệp rồi phê duyệt hoặc từ chối.
-6. B nhận thông báo kết quả. Dashboard và nhật ký phản ánh thao tác.
-7. Tạo tổ chức thứ hai bằng tài khoản khác để minh họa cách ly dữ liệu. Một tài khoản chỉ thấy các tổ chức mình là thành viên.
+5. A nhận thông báo, mở Trung tâm phê duyệt để xem hồ sơ/tệp và phê duyệt hoặc từ chối.
+6. B nhận tín hiệu realtime, ứng dụng tải lại thông báo và dữ liệu theo quyền hiện tại. Dashboard và nhật ký phản ánh thao tác.
+7. Tạo tổ chức thứ hai để minh họa cách ly dữ liệu. Một tài khoản chỉ thấy các tổ chức mà mình là thành viên.
 
 Có thể tự tạo ứng dụng và biểu mẫu theo nhu cầu của tổ chức. Vai trò `owner` thuộc từng tổ chức và chịu trách nhiệm quản lý thành viên, cấu hình ứng dụng trong tổ chức đó.
 
@@ -268,7 +297,9 @@ Có thể tự tạo ứng dụng và biểu mẫu theo nhu cầu của tổ ch�
 | editor | Tạo hồ sơ, sửa/gửi hồ sơ của mình; duyệt hồ sơ người khác khi vai trò quy trình là editor                       |
 | viewer | Đọc hồ sơ và những trường được cấp quyền, tải tệp; không thay đổi dữ liệu                                       |
 
-Phân quyền trong phiên bản này dựa trên tổ chức, vai trò và trường dữ liệu; chưa hỗ trợ vai trò tùy chỉnh hoặc phân quyền theo phòng ban, bảng dữ liệu. Tất cả thành viên tổ chức thấy tiêu đề, trạng thái hồ sơ và các tệp trong tổ chức; không đưa thông tin chỉ-admin vào tiêu đề/tệp nếu muốn ẩn bằng field permissions.
+Phân quyền dựa trên tổ chức, vai trò, ứng dụng, bảng và trường dữ liệu. Owner có thể tạo vai trò tùy chỉnh từ base role `admin`, `editor` hoặc `viewer`, sau đó chọn các quyền thao tác cụ thể. Quyền thực tế là giao của giới hạn base role, tập quyền của custom role và cấu hình ứng dụng/trường; route mới chưa được phân loại sẽ bị từ chối theo nguyên tắc fail closed.
+
+Custom role hiện sử dụng REST API; GraphQL từ chối policy custom role vì metadata Hasura chỉ ánh xạ các vai trò nền. Hệ thống chưa có chính sách hàng dữ liệu theo phòng ban, học sinh hoặc điều kiện ABAC tùy ý.
 
 Schema động sử dụng `fields` và từng dòng JSONB `record_values`. Metadata Hasura có thể lọc từng giá trị; Core cũng áp dụng quyền này. Khóa ngoại ghép chặn liên kết chéo tổ chức. Chi tiết ở `server/db/README.md`.
 
@@ -283,8 +314,10 @@ API nghiệp vụ cần `Authorization: Bearer <Logto access token>` và `X-Tena
 | GET `/api/me`                           | Subject và tổ chức hiện có                     |
 | POST `/api/organizations`               | Tạo tổ chức và owner                            |
 | GET/PUT/DELETE `/api/members[/subject]` | Danh sách, gán role, gỡ thành viên             |
+| GET/POST/PUT/DELETE `/api/roles[/id]`   | Quản lý vai trò tùy chỉnh của tổ chức          |
 | GET/POST `/api/apps`                    | Ứng dụng                                       |
-| POST `/api/templates/office`            | Tạo mẫu Văn phòng số                           |
+| GET `/api/builder/templates`            | Danh sách và xem cấu trúc mẫu ứng dụng          |
+| POST `/api/builder/templates/:id/install` | Cài mẫu trường học hoặc nghỉ phép             |
 | GET/POST `/api/collections`             | Bảng dữ liệu                                   |
 | PATCH `/api/collections/:id`            | Tên và cấu hình workflow                       |
 | GET/POST `/api/collections/:id/fields`  | Trường và quyền                                |
@@ -295,6 +328,10 @@ API nghiệp vụ cần `Authorization: Bearer <Logto access token>` và `X-Tena
 | POST `/api/approvals/:id/decide`        | Quyết định và nhận xét                         |
 | GET/POST `/api/records/:id/files`       | Tệp đính kèm                                   |
 | GET `/api/files/:id/download`           | Tải tệp có kiểm tra quyền trong tổ chức                    |
+| POST `/api/builder/collections/:id/import[/preview]` | Nhập CSV/XLSX có bước xem trước       |
+| POST `/api/builder/collections/:id/export` | Xuất dữ liệu CSV/XLSX                        |
+| GET `/api/builder/apps/:id/export`      | Xuất gói cấu hình ứng dụng                     |
+| POST `/api/builder/packages/import`     | Nhập gói cấu hình ứng dụng                     |
 | GET `/api/dashboard`                    | Thống kê                                       |
 | GET `/api/notifications`                | Thông báo cá nhân                              |
 | POST `/api/notifications/read`          | Đánh dấu đã đọc                                |
