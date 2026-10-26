@@ -47,6 +47,7 @@ export function Studio({
   const [tab, setTab] = useState("data");
   const [create, setCreate] = useState(false);
   const [tool, setTool] = useState("");
+  const [advanced, setAdvanced] = useState(false);
   const admin = ["owner", "admin"].includes(role);
   const refresh = () => setTick((t) => t + 1);
   const select = (a: Row) => {
@@ -54,6 +55,7 @@ export function Studio({
     setTab("data");
     setError("");
     setCreate(false);
+    setAdvanced(false);
   };
   useEffect(() => {
     if (!app) return;
@@ -82,6 +84,8 @@ export function Studio({
       : []),
     ...panels,
   ];
+  const basicTabs = new Set(["data", "pages", "menu"]);
+  const shownTabs = advanced ? tabs : tabs.filter((x) => basicTabs.has(x.id));
   const current = tabs.some((x) => x.id === tab) ? tab : tabs[0]?.id;
   const panel = panels.find((x) => x.id === current);
   const Component = panel?.component;
@@ -92,14 +96,14 @@ export function Studio({
       <header className="studio-heading">
         <div>
           <span className="eyebrow">
-            WORKSPACE / {app ? "ỨNG DỤNG" : "THƯ VIỆN"}
+            THIẾT KẾ / {app ? "ỨNG DỤNG" : "DANH SÁCH"}
           </span>
           <h1>{app ? app.name : "Không gian ứng dụng"}</h1>
           <p>
             {app
               ? app.description ||
                 "Quản lý dữ liệu và thiết kế không gian làm việc của bạn."
-              : "Dữ liệu, biểu mẫu và quy trình. Kết nối trong một nơi."}
+              : "Tạo ứng dụng và tổ chức các bảng dữ liệu theo nghiệp vụ của bạn."}
           </p>
         </div>
         {app ? (
@@ -140,10 +144,10 @@ export function Studio({
               <Layers3 size={28} />
             </div>
             <div>
-              <h2>Thiết kế theo cách bạn làm việc</h2>
+              <h2>Thiết kế theo nhu cầu của tổ chức</h2>
               <p>
-                Bắt đầu từ ứng dụng có sẵn, cài một mẫu hoặc tạo cấu trúc riêng
-                cho đội ngũ.
+                Chọn ứng dụng bên dưới để cấu hình bảng, biểu mẫu và quyền truy cập.
+                Người mới có thể dùng mẫu sẵn tại mục Ứng dụng & biểu mẫu.
               </p>
             </div>
             <Sparkles className="intro-spark" size={28} />
@@ -244,7 +248,7 @@ export function Studio({
             role="group"
             aria-label="Chức năng ứng dụng"
           >
-            {tabs.map((t) => (
+            {shownTabs.map((t) => (
               <button
                 key={t.id}
                 aria-pressed={current === t.id}
@@ -254,6 +258,12 @@ export function Studio({
                 {t.name}
               </button>
             ))}
+            {tabs.some((t) => !basicTabs.has(t.id)) && (
+              <button className="advanced-toggle" aria-pressed={advanced} onClick={() => {
+                if (advanced && !basicTabs.has(tab)) setTab("data");
+                setAdvanced((v) => !v);
+              }}>{advanced ? "Ẩn tùy chỉnh" : "Cấu hình nâng cao"}</button>
+            )}
           </div>
           <section className="surface app-workspace">
             <PanelBoundary key={app.id + ":" + current}>

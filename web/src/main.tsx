@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { LogtoProvider } from '@logto/react';
 import App from './App';
 import './style.css';
+import './brand.css';
 export type Config = { endpoint: string; appId: string; resource: string; origin: string };
 async function start() {
   const response = await fetch('/config.json', { cache: 'no-store' });

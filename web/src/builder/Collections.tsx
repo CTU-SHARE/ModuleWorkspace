@@ -164,6 +164,7 @@ export function Collections(p: PanelProps) {
 function CollectionPanels(p: PanelProps) {
   const can = useCan();
   const [active, setActive] = useState("records");
+  const [advanced, setAdvanced] = useState(false);
   const order = [
     "records",
     "kanban",
@@ -184,6 +185,8 @@ function CollectionPanels(p: PanelProps) {
         bi = order.indexOf(b.id);
       return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
     });
+  const advancedIds = new Set(["fields", "form-designer", "actions"]);
+  const visiblePanels = advanced ? panels : panels.filter((x) => !advancedIds.has(x.id));
   const selected = panels.find((x) => x.id === active) || panels[0];
   const View = selected?.component;
   return (
@@ -193,7 +196,7 @@ function CollectionPanels(p: PanelProps) {
         role="group"
         aria-label="Chế độ xem và thiết kế bảng"
       >
-        {panels.map((x) => (
+        {visiblePanels.map((x) => (
           <button
             key={x.id}
             aria-pressed={selected?.id === x.id}
@@ -203,6 +206,12 @@ function CollectionPanels(p: PanelProps) {
             {x.name}
           </button>
         ))}
+        {p.admin && panels.some((x) => advancedIds.has(x.id)) && (
+          <button className="advanced-toggle" aria-pressed={advanced} onClick={() => {
+            if (advanced && advancedIds.has(active)) setActive("records");
+            setAdvanced((v) => !v);
+          }}>{advanced ? "Ẩn thiết kế" : "Thiết kế nâng cao"}</button>
+        )}
       </div>
       <div className="view-content">
         <PanelBoundary key={p.collection!.id + ":" + selected?.id}>

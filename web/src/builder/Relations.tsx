@@ -58,6 +58,7 @@ function Picker(p: ValueProps) {
       {result.error && <p>{result.error}</p>}
       <input
         aria-label="Tìm hồ sơ liên kết"
+        placeholder="Tìm theo tên hồ sơ…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -71,6 +72,7 @@ function Picker(p: ValueProps) {
           Bỏ {result.data?.items.find((r: Row) => r.id === id)?.title || id}
         </button>
       ))}
+      {result.data?.items.length === 0 && <small>Chưa có hồ sơ để chọn. Tạo hồ sơ ở bảng liên quan trước.</small>}
       {result.data?.items.map((r: Row) => (
         <label key={r.id}>
           <input
@@ -90,16 +92,13 @@ function Picker(p: ValueProps) {
           {r.title}
         </label>
       ))}
-      <button type="button" disabled={page === 1} onClick={() => setPage((n) => n - 1)}>
-        Trước
-      </button>
-      <button
-        type="button"
-        disabled={!result.data || page * 30 >= result.data.total}
-        onClick={() => setPage((n) => n + 1)}
-      >
-        Sau
-      </button>
+      {(page > 1 || (result.data?.total || 0) > 30) && (
+        <div className="pagination">
+          <button type="button" disabled={page === 1} onClick={() => setPage((n) => n - 1)}>Trước</button>
+          <span>Trang {page}</span>
+          <button type="button" disabled={!result.data || page * 30 >= result.data.total} onClick={() => setPage((n) => n + 1)}>Sau</button>
+        </div>
+      )}
     </div>
   );
 }

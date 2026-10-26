@@ -31,8 +31,16 @@ import {
   Download,
   Trash2,
   RefreshCw,
+  School,
+  ClipboardList,
+  BriefcaseBusiness,
+  BookOpenCheck,
+  Menu,
+  CircleHelp,
+  ArrowRight,
 } from "lucide-react";
 import { Studio } from "./builder/Studio";
+import { ValueInput } from "./builder/ValueInput";
 import type { Config } from "./main";
 import { useApi, type API } from "./useApi";
 type Row = Record<string, any>;
@@ -42,6 +50,22 @@ const statusNames: Record<string, string> = {
   approved: "Đã duyệt",
   rejected: "Từ chối",
 };
+const starterTemplates = [
+  {
+    id: "school",
+    title: "Quản lý trường học",
+    description: "Học sinh, giáo viên, lớp học, đơn nghỉ học và kế hoạch năm học.",
+    detail: "6 bảng dữ liệu · Có đơn xin nghỉ và phê duyệt",
+    icon: School,
+  },
+  {
+    id: "office",
+    title: "Quản lý nghỉ phép",
+    description: "Nhân viên gửi đơn, người phụ trách xem xét và duyệt yêu cầu.",
+    detail: "1 bảng dữ liệu · Có quy trình phê duyệt",
+    icon: BriefcaseBusiness,
+  },
+] as const;
 const roleNames: Record<string, string> = {
   owner: "Chủ sở hữu",
   admin: "Quản trị viên",
@@ -99,9 +123,9 @@ function Badge({ value }: { value: string }) {
 function Empty({ text }: { text: string }) {
   return (
     <div className="empty">
-      <Layers3 size={34} />
+      <span className="empty-symbol"><ClipboardList size={26} /></span>
       <h3>{text}</h3>
-      <p>Bắt đầu bằng một thao tác nhỏ để xây dựng không gian của bạn.</p>
+      <p>Thông tin sẽ xuất hiện tại đây khi có dữ liệu phù hợp.</p>
     </div>
   );
 }
@@ -133,7 +157,8 @@ function Workspace({ config }: { config: Config }) {
     [filter, setFilter] = useState(""),
     [page, setPage] = useState(1),
     [count, setCount] = useState(0),
-    [side, setSide] = useState(true);
+    [side, setSide] = useState(() => window.matchMedia("(min-width: 761px)").matches),
+    [appSearch, setAppSearch] = useState("");
   const version = useRef(0);
   const tokenFn = useRef(getAccessToken);
   tokenFn.current = getAccessToken;
@@ -309,6 +334,7 @@ function Workspace({ config }: { config: Config }) {
   const manageMembers = isAdmin && !custom;
   const canWrite = org?.role !== "viewer";
   const nav = (v: string) => {
+    if (window.matchMedia("(max-width: 760px)").matches) setSide(false);
     setView(v);
     setData(null);
     setPage(1);
@@ -340,35 +366,33 @@ function Workspace({ config }: { config: Config }) {
       <div className="login">
         <div className="login-art">
           <div className="brand">
-            <span className="brandmark">M</span>Module Workspace
+            <img className="brandmark" src="/brand-flower.svg" alt="" />
+            <span>Module Workspace</span>
           </div>
-          <small>KHÔNG GIAN LÀM VIỆC SỐ</small>
+          <span className="eyebrow">NỀN TẢNG QUẢN LÝ ĐA NGHIỆP VỤ</span>
           <h1>
-            Từ ý tưởng.
+            Mọi công việc,
             <br />
-            Đến quy trình.
-            <br />
-            <em>Trong một nơi.</em>
+            <em>trong một không gian.</em>
           </h1>
           <p>
-            Thiết kế dữ liệu, cộng tác và tự động hóa công việc cho tổ chức của
-            bạn.
+            Quản lý dữ liệu, phối hợp giữa các bộ phận và theo dõi tiến độ
+            rõ ràng, từ văn phòng đến trường học.
           </p>
-          <div className="orbit">
-            <Layers3 size={100} />
+          <div className="login-features">
+            <span><ClipboardList size={18} /> Quản lý tập trung</span>
+            <span><Users size={18} /> Phối hợp linh hoạt</span>
+            <span><Activity size={18} /> Theo dõi tiến độ</span>
           </div>
-          <footer>HUMAN · PROCESS · DATA</footer>
+          <div className="orbit"><img src="/brand-flower.svg" alt="" /></div>
+          <footer>Module Workspace · CTU.Share</footer>
         </div>
         <div className="login-form">
-          <span className="eyebrow">CHÀO MỪNG ĐẾN MODULE WORKSPACE</span>
-          <h2>
-            Cùng làm việc
-            <br />
-            có hệ thống hơn.
-          </h2>
+          <span className="eyebrow">CHÀO MỪNG BẠN</span>
+          <h2>Bắt đầu không gian làm việc của bạn</h2>
           <p>
-            Đăng nhập tập trung qua Logto để truy cập các tổ chức và ứng dụng
-            của bạn.
+            Đăng nhập để xem các yêu cầu cần xử lý, dữ liệu đã chia sẻ và ứng
+            dụng của tổ chức.
           </p>
           <button
             className="primary"
@@ -378,21 +402,29 @@ function Workspace({ config }: { config: Config }) {
               )
             }
           >
-            Đăng nhập bằng SSO <ArrowUpRight size={18} />
+            Đăng nhập <ArrowRight size={18} />
           </button>
           {error && <p className="error">{error}</p>}
-          <small>Dữ liệu được phân quyền theo từng tổ chức.</small>
+          <small>Quyền truy cập được quản lý riêng cho từng tổ chức.</small>
         </div>
       </div>
     );
   return (
     <PermissionProvider permissions={custom ? (org?.permissions || []) : null}>
       <div className={"shell " + (!side ? "collapsed" : "")}>
-        <aside>
+        {side && (
+          <button
+            className="mobile-backdrop"
+            aria-label="Đóng menu điều hướng"
+            onClick={() => setSide(false)}
+          />
+        )}
+        <aside aria-label="Điều hướng chính">
           <div className="brand">
-            <span className="brandmark">M</span>Module Workspace
+            <img className="brandmark" src="/brand-flower.svg" alt="" />
+            <span>Module Workspace</span>
           </div>
-          <div className="workspace-label">KHÔNG GIAN HIỆN TẠI</div>
+          <div className="workspace-label">TỔ CHỨC CỦA BẠN</div>
           <select
             className="org-select"
             value={tenant}
@@ -418,38 +450,34 @@ function Workspace({ config }: { config: Config }) {
             className="new-workspace"
             onClick={() => setModal("organization")}
           >
-            <Plus size={14} /> Tạo tổ chức
+            <Plus size={14} /> Thêm tổ chức
           </button>
-          <nav>
+          <nav aria-label="Các chức năng">
+            <span className="nav-group-label">LÀM VIỆC</span>
             {[
               [LayoutDashboard, "dashboard", "Tổng quan"],
-              [Layers3, "apps", "Danh mục ứng dụng"],
-              [Settings2, "studio", "Không gian ứng dụng"],
-              [CheckCheck, "approvals", "Phê duyệt"],
-              [Users, "members", "Thành viên"],
+              [Layers3, "apps", "Ứng dụng & biểu mẫu"],
+              [CheckCheck, "approvals", "Yêu cầu phê duyệt"],
               [Bell, "notifications", "Thông báo"],
-              ...(isAdmin
-                ? [
-                  [ScrollText, "audit", "Nhật ký"],
-                  [Activity, "operations", "Vận hành"],
-                ]
-                : []),
-              ...(isOwner ? [[Settings2, "roles", "Vai trò & quyền"]] : []),
             ].filter(([, key]: any) => !viewPermissions[key] || can(viewPermissions[key])).map(([Icon, key, title]: any) => (
-              <button
-                key={key}
-                className={view === key ? "active" : ""}
-                onClick={() => nav(key)}
-              >
-                <Icon size={19} />
-                {title}
-                {key === "notifications" && count > 0 && (
-                  <span className="nav-count">{count}</span>
-                )}
+              <button key={key} className={view === key ? "active" : ""} aria-current={view === key ? "page" : undefined} onClick={() => nav(key)}>
+                <Icon size={19} /> <span>{title}</span>
+                {key === "notifications" && count > 0 && <span className="nav-count">{count}</span>}
+              </button>
+            ))}
+            <span className="nav-group-label">QUẢN LÝ</span>
+            {[
+              [Users, "members", "Thành viên"],
+              [Settings2, "studio", "Thiết kế ứng dụng"],
+              ...(isOwner ? [[BookOpenCheck, "roles", "Vai trò & quyền"]] : []),
+              ...(isAdmin ? [[ScrollText, "audit", "Nhật ký hoạt động"], [Activity, "operations", "Vận hành"]] : []),
+            ].filter(([, key]: any) => !viewPermissions[key] || can(viewPermissions[key])).map(([Icon, key, title]: any) => (
+              <button key={key} className={view === key ? "active" : ""} aria-current={view === key ? "page" : undefined} onClick={() => nav(key)}>
+                <Icon size={19} /> <span>{title}</span>
               </button>
             ))}
           </nav>
-          <div className="workspace-label">BẢNG DỮ LIỆU</div>
+          <div className="workspace-label">TRUY CẬP NHANH DỮ LIỆU</div>
           <div className="collection-nav">
             {collections.map((c) => (
               <button
@@ -459,8 +487,8 @@ function Workspace({ config }: { config: Config }) {
                 }
                 onClick={() => select(c)}
               >
-                <span className="dot" />
-                {c.name}
+                <FileText size={16} />
+                <span>{c.name}</span>
               </button>
             ))}
           </div>
@@ -488,14 +516,15 @@ function Workspace({ config }: { config: Config }) {
               aria-label="Ẩn hiện menu"
               onClick={() => setSide(!side)}
             >
-              <PanelLeftClose size={19} />
+              {side ? <PanelLeftClose size={19} /> : <Menu size={19} />}
             </button>
             <span>
-              Không gian làm việc <ChevronRight size={14} />{" "}
-              {org?.name || "Khởi tạo"}
+              <span className="topbar-parent">{org?.name || "Tổ chức"}</span>
+              <ChevronRight size={14} />
+              <strong>{({dashboard: "Tổng quan", apps: "Ứng dụng", records: selected?.name || "Dữ liệu", approvals: "Phê duyệt", studio: "Thiết kế", members: "Thành viên", notifications: "Thông báo", roles: "Vai trò & quyền", audit: "Nhật ký", operations: "Vận hành"} as Row)[view] || "Không gian làm việc"}</strong>
             </span>
             <div className="top-actions">
-              <span className="live-dot" /> {me?.user}{" "}
+              <span className="user-pill"><span className="user-avatar">{(accountName || me?.user || "U").slice(0, 1).toUpperCase()}</span><span>{accountName || roleNames[org?.role] || "Tài khoản"}</span></span>{" "}
               <button className="icon" onClick={refresh} aria-label="Tải lại">
                 <RefreshCw size={17} />
               </button>
@@ -548,51 +577,41 @@ function Workspace({ config }: { config: Config }) {
               </div>
             ) : (
               <>
-                <div className="page-heading">
+                {view !== "studio" && view !== "roles" && (<div className="page-heading">
                   <div>
                     <span className="eyebrow">
                       {view === "records"
-                        ? "DỮ LIỆU & QUY TRÌNH"
-                        : "MODULE WORKSPACE / WORKSPACE"}
+                        ? "DANH SÁCH HỒ SƠ"
+                        : "MODULE WORKSPACE"}
                     </span>
                     <h1>
                       {(
                         {
-                          dashboard: "Một góc nhìn, toàn bộ công việc.",
-                          apps: "Ứng dụng của tổ chức",
-                          approvals: "Trung tâm phê duyệt",
-                          members: "Con người & phân quyền",
-                          notifications: "Thông báo của bạn",
-                          audit: "Lịch sử hoạt động",
-                          operations: "Vận hành tự động hóa",
+                          dashboard: "Tổng quan công việc",
+                          apps: "Ứng dụng & biểu mẫu",
+                          approvals: "Yêu cầu phê duyệt",
+                          members: "Thành viên & phân quyền",
+                          notifications: "Thông báo",
+                          audit: "Nhật ký hoạt động",
+                          operations: "Theo dõi vận hành",
                         } as Row
                       )[view] || selected?.name}
                     </h1>
                     <p>
                       {view === "dashboard"
-                        ? "Mọi thông tin cần thiết để bắt đầu một ngày làm việc hiệu quả."
+                        ? "Theo dõi tình hình và truy cập nhanh những việc cần làm."
                         : view === "records"
-                          ? selected?.description
-                          : "Quản lý tập trung. Cộng tác rõ ràng. Dữ liệu có cấu trúc."}
+                          ? selected?.description || "Xem, tìm kiếm và cập nhật các hồ sơ trong bảng này."
+                          : view === "apps"
+                            ? "Chọn ứng dụng để làm việc hoặc bắt đầu từ một mẫu có sẵn."
+                            : view === "approvals"
+                              ? "Xem các yêu cầu đang chờ và kết quả đã xử lý."
+                              : "Thông tin và công cụ dành cho tổ chức của bạn."}
                     </p>
                   </div>
                   <div className="actions">
                     {view === "apps" && isAdmin && can("apps.manage") && (
                       <>
-                        <button
-                          disabled={busy}
-                          onClick={() =>
-                            void act(async () => {
-                              const r = await api(
-                                "/api/templates/office",
-                                "POST",
-                              );
-                              select(r.collection);
-                            })
-                          }
-                        >
-                          Dùng mẫu Văn phòng số
-                        </button>
                         <button
                           className="primary"
                           onClick={() => setModal("app")}
@@ -616,7 +635,7 @@ function Workspace({ config }: { config: Config }) {
                               setModal("record");
                             }}
                           >
-                            <Plus size={17} /> Tạo hồ sơ
+                            <Plus size={17} /> Thêm hồ sơ
                           </button>
                         )}
                       </>
@@ -633,140 +652,109 @@ function Workspace({ config }: { config: Config }) {
                       </button>
                     )}
                   </div>
-                </div>
+                </div>)}
                 {loading && <div className="loading">Đang tải dữ liệu…</div>}
                 {!loading && view === "dashboard" && data?.statuses && (
                   <>
+                    <section className="dashboard-hero">
+                      <div>
+                        <span className="hero-kicker"><img src="/brand-flower.svg" alt="" /> KHÔNG GIAN LÀM VIỆC</span>
+                        <h2>Chào mừng đến với {org?.name || "tổ chức"}</h2>
+                        <p>Chọn một công việc để bắt đầu. Các yêu cầu, biểu mẫu và dữ liệu đều được quản lý tại đây.</p>
+                      </div>
+                      <div className="hero-actions">
+                        {collections.length > 0 && can("records.read") && (
+                          <button className="primary" onClick={() => select(collections[0])}><FileText size={17} /> Mở hồ sơ <ArrowRight size={16} /></button>
+                        )}
+                        {can("approvals.read") && (
+                          <button onClick={() => nav("approvals")}><CheckCheck size={17} /> Xem phê duyệt</button>
+                        )}
+                        {!collections.length && can("apps.read") && (
+                          <button className="primary" onClick={() => nav("apps")}><Layers3 size={17} /> Khám phá ứng dụng</button>
+                        )}
+                      </div>
+                    </section>
                     <div className="stats">
                       {[
-                        ["Ứng dụng", data.apps, "apps"],
-                        ["Thành viên", data.members, "members"],
-                        [
-                          "Chờ phê duyệt",
-                          data.statuses.find((x: Row) => x.status === "pending")
-                            ?.count || 0,
-                          "approvals",
-                        ],
-                        [
-                          "Hồ sơ đã duyệt",
-                          data.statuses.find((x: Row) => x.status === "approved")
-                            ?.count || 0,
-                          "approvals",
-                        ],
-                      ].map(([title, value, key]) => (
-                        <button
-                          className="stat"
-                          key={title}
-                          onClick={() => nav(key)}
-                        >
-                          <span>
-                            {title}
-                            <ArrowUpRight size={16} />
-                          </span>
-                          <strong>{value}</strong>
-                          <small>Dữ liệu trong tổ chức hiện tại</small>
+                        {title: "Tổng hồ sơ", value: data.statuses.reduce((sum: number, x: Row) => sum + Number(x.count || 0), 0), key: "apps", icon: FileText, description: "Trong các bảng dữ liệu", permission: "apps.read"},
+                        {title: "Chờ phê duyệt", value: data.statuses.find((x: Row) => x.status === "pending")?.count || 0, key: "approvals", icon: CheckCheck, description: "Yêu cầu cần theo dõi", permission: "approvals.read"},
+                        {title: "Đã phê duyệt", value: data.statuses.find((x: Row) => x.status === "approved")?.count || 0, key: "approvals", icon: BookOpenCheck, description: "Hồ sơ đã hoàn tất duyệt", permission: "approvals.read"},
+                        {title: "Ứng dụng", value: data.apps, key: "apps", icon: Layers3, description: `${data.members} thành viên trong tổ chức`, permission: "apps.read"},
+                      ].filter((stat) => can(stat.permission)).map((stat) => (
+                        <button className="stat" key={stat.title} onClick={() => nav(stat.key)}>
+                          <span className="stat-heading"><span className="stat-icon"><stat.icon size={18} /></span><ArrowUpRight size={16} /></span>
+                          <small>{stat.title}</small>
+                          <strong>{stat.value}</strong>
+                          <span className="stat-description">{stat.description}</span>
                         </button>
                       ))}
                     </div>
                     <div className="dashboard-grid">
                       <section className="panel">
                         <div className="section-head">
-                          <h2>Không gian ứng dụng</h2>
-                          <button className="link" onClick={() => nav("apps")}>
-                            Xem tất cả <ArrowUpRight size={16} />
-                          </button>
+                          <div><h2>Truy cập nhanh</h2><p>Chọn nhóm dữ liệu bạn muốn làm việc</p></div>
+                          {can("apps.read") && <button className="link" onClick={() => nav("apps")}>Tất cả ứng dụng <ArrowUpRight size={16} /></button>}
                         </div>
-                        {apps.length ? (
-                          apps.map((a) => (
-                            <button
-                              className="app-row"
-                              key={a.id}
-                              onClick={() => nav("apps")}
-                            >
-                              <span className="tile-icon">
-                                <Layers3 />
-                              </span>
-                              <span>
-                                <strong>{a.name}</strong>
-                                <small>
-                                  {a.description ||
-                                    "Ứng dụng quản lý của tổ chức"}
-                                </small>
-                              </span>
-                              <ChevronRight size={18} />
-                            </button>
-                          ))
-                        ) : (
-                          <Empty text="Chưa có ứng dụng" />
-                        )}
+                        {collections.length ? collections.slice(0, 6).map((c) => (
+                          <button className="app-row" key={c.id} onClick={() => select(c)}>
+                            <span className="tile-icon"><FileText size={20} /></span>
+                            <span><strong>{c.name}</strong><small>{c.description || "Xem và quản lý các hồ sơ"}</small></span>
+                            {c.workflow_enabled && <span className="flow-chip">Có phê duyệt</span>}
+                            <ChevronRight size={18} />
+                          </button>
+                        )) : <Empty text="Chưa có bảng dữ liệu" />}
                       </section>
-                      <section className="guide">
-                        <span className="eyebrow">QUY TRÌNH RÕ RÀNG</span>
-                        <h2>
-                          Đưa công việc
-                          <br />
-                          vào đúng luồng.
-                        </h2>
-                        <p>
-                          Từ một biểu mẫu đơn giản đến hồ sơ được phê duyệt, mọi
-                          bước đều có người chịu trách nhiệm.
-                        </p>
-                        <ol>
-                          <li>Tạo ứng dụng và bảng dữ liệu</li>
-                          <li>Thiết kế trường và quyền truy cập</li>
-                          <li>Bật quy trình phê duyệt</li>
-                          <li>Theo dõi kết quả tại đây</li>
-                        </ol>
+                      <section className="panel steps-panel">
+                        <div className="section-head"><div><h2>Làm việc như thế nào?</h2><p>Ba bước cơ bản để xử lý công việc</p></div><CircleHelp size={21} /></div>
+                        <div className="steps-list">
+                          <div><span>01</span><section><strong>Chọn ứng dụng hoặc bảng dữ liệu</strong><p>Ví dụ: Học sinh, Đơn nghỉ học hoặc Đề nghị mua sắm.</p></section></div>
+                          <div><span>02</span><section><strong>Tạo và cập nhật hồ sơ</strong><p>Nhập thông tin vào biểu mẫu, lưu lại và gửi duyệt khi cần.</p></section></div>
+                          <div><span>03</span><section><strong>Kiểm tra tiến độ</strong><p>Người có quyền phê duyệt xem xét và theo dõi kết quả.</p></section></div>
+                        </div>
                       </section>
                     </div>
+                    {isAdmin && can("templates.install") && !apps.length && (
+                      <section className="starter-section">
+                        <div className="section-heading"><div><span className="eyebrow">BẮT ĐẦU NHANH</span><h2>Chọn mẫu theo công việc</h2><p>Các bảng dữ liệu và biểu mẫu cơ bản được thiết lập sẵn.</p></div></div>
+                        <div className="starter-grid">
+                          {starterTemplates.map((t) => <button className="starter-card" key={t.id} onClick={() => setModal("template-" + t.id)}><span className="starter-symbol"><t.icon size={24} /></span><strong>{t.title}</strong><p>{t.description}</p><small>{t.detail}</small><span className="starter-link">Sử dụng mẫu <ArrowRight size={16} /></span></button>)}
+                        </div>
+                      </section>
+                    )}
                   </>
                 )}
                 {!loading && view === "apps" && (
-                  <div className="app-grid">
-                    {apps.map((a) => (
-                      <section className="app-card" key={a.id}>
-                        <div className="app-card-head">
-                          <span className="tile-icon">
-                            <Layers3 />
-                          </span>
-                          <span className="subtle">
-                            {collections.filter((c) => c.app_id === a.id).length}{" "}
-                            bảng
-                          </span>
+                  <>
+                    {isAdmin && can("templates.install") && (
+                      <section className="starter-section">
+                        <div className="section-heading"><div><span className="eyebrow">THƯ VIỆN MẪU</span><h2>Bắt đầu với một cấu trúc có sẵn</h2><p>Phù hợp cho trường học, phòng ban hoặc nhóm làm việc.</p></div></div>
+                        <div className="starter-grid">
+                          {starterTemplates.map((t) => <button className="starter-card" key={t.id} onClick={() => setModal("template-" + t.id)}><span className="starter-symbol"><t.icon size={24} /></span><strong>{t.title}</strong><p>{t.description}</p><small>{t.detail}</small><span className="starter-link">Sử dụng mẫu <ArrowRight size={16} /></span></button>)}
                         </div>
-                        <h2>{a.name}</h2>
-                        <p>
-                          {a.description ||
-                            "Không gian quản lý dữ liệu và quy trình."}
-                        </p>
-                        <div className="table-links">
-                          {collections
-                            .filter((c) => c.app_id === a.id)
-                            .map((c) => (
-                              <button key={c.id} onClick={() => select(c)}>
-                                <FileText size={16} />
-                                {c.name}
-                                <ChevronRight size={16} />
-                              </button>
-                            ))}
-                        </div>
-                        {isAdmin && (
-                          <button
-                            className="text-btn"
-                            onClick={() => {
-                              setEditing(a);
-                              setModal("collection");
-                            }}
-                          >
-                            <Plus size={16} /> Thêm bảng dữ liệu
-                          </button>
-                        )}
                       </section>
-                    ))}
-                    {!apps.length && (
-                      <Empty text="Tạo ứng dụng đầu tiên của bạn" />
                     )}
-                  </div>
+                    <section className="installed-apps">
+                      <div className="section-heading"><div><h2>Ứng dụng của tổ chức</h2><p>Mở bảng dữ liệu ngay trong ứng dụng phù hợp.</p></div>
+                        <label className="search app-filter"><Search size={17} /><input aria-label="Tìm ứng dụng" placeholder="Tìm ứng dụng…" value={appSearch} onChange={(e) => setAppSearch(e.target.value)} /></label>
+                      </div>
+                      <div className="app-grid">
+                        {apps.filter((a) => a.name.toLowerCase().includes(appSearch.trim().toLowerCase())).map((a) => (
+                          <section className="app-card" key={a.id}>
+                            <div className="app-card-head"><span className="tile-icon">{a.icon === "School" ? <School /> : <Layers3 />}</span><span className="subtle">{collections.filter((c) => c.app_id === a.id).length} bảng dữ liệu</span></div>
+                            <h2>{a.name}</h2>
+                            <p>{a.description || "Không gian quản lý dữ liệu và quy trình."}</p>
+                            <div className="table-links">
+                              {collections.filter((c) => c.app_id === a.id).map((c) => (
+                                <button key={c.id} onClick={() => select(c)}><FileText size={16} /><span>{c.name}</span><ChevronRight size={16} /></button>
+                              ))}
+                            </div>
+                            {isAdmin && can("collections.manage") && <button className="text-btn" onClick={() => {setEditing(a);setModal("collection");}}><Plus size={16} /> Thêm bảng dữ liệu</button>}
+                          </section>
+                        ))}
+                        {!apps.length ? <Empty text="Chưa có ứng dụng nào" /> : !apps.some((a) => a.name.toLowerCase().includes(appSearch.trim().toLowerCase())) ? <Empty text="Không tìm thấy ứng dụng" /> : null}
+                      </div>
+                    </section>
+                  </>
                 )}
                 {!loading && view === "records" && data?.items && (
                   <section className="panel">
@@ -798,6 +786,7 @@ function Workspace({ config }: { config: Config }) {
                       </select>
                       <span className="subtle">{data.total} hồ sơ</span>
                     </div>
+                    {selected?.workflow_enabled && <div className="workflow-hint"><CheckCheck size={17} /> Sau khi lưu hồ sơ, mở lại và chọn “Gửi phê duyệt” để chuyển cho người phụ trách.</div>}
                     <div className="table-scroll">
                       <table>
                         <thead>
@@ -831,11 +820,7 @@ function Workspace({ config }: { config: Config }) {
                               </td>
                               {fields.slice(0, 4).map((f) => (
                                 <td key={f.id}>
-                                  {typeof r.data[f.key] === "boolean"
-                                    ? r.data[f.key]
-                                      ? "Có"
-                                      : "Không"
-                                    : String(r.data[f.key] ?? "—")}
+                                  {typeof r.data[f.key] === "boolean" ? (r.data[f.key] ? "Có" : "Không") : Array.isArray(r.data[f.key]) ? `${r.data[f.key].length} mục` : typeof r.data[f.key] === "object" && r.data[f.key] !== null ? "Xem chi tiết" : String(r.data[f.key] ?? "—")}
                                 </td>
                               ))}
                               <td className="subtle">
@@ -1141,9 +1126,28 @@ function Workspace({ config }: { config: Config }) {
             )}
           </div>
           <footer className="page-footer">
-            Module Workspace <span>Không gian chung. Năng lực riêng.</span>
+            <span>Module Workspace</span><span>Quản lý tập trung · Phối hợp linh hoạt · Theo dõi tiến độ</span>
           </footer>
         </main>
+        {starterTemplates.map((t) => modal === "template-" + t.id && (
+          <Modal key={t.id} title={"Bắt đầu với " + t.title} close={() => setModal("")}>
+            <div className="template-preview">
+              <span className="starter-symbol"><t.icon size={26} /></span>
+              <p>{t.description}</p>
+              <small>{t.detail}</small>
+              {t.id === "school" && <p className="template-tip">Nên nhập Phòng ban, Giáo viên và Học sinh trước khi tạo Lớp học hoặc Đơn nghỉ học.</p>}
+            </div>
+            <form onSubmit={submit(async (f) => {
+              await api(`/api/builder/templates/${t.id}/install`, "POST", { name: String(f.get("name") || "").trim() });
+              setModal("");
+              setSuccess("Ứng dụng đã sẵn sàng. Chọn một bảng dữ liệu để bắt đầu.");
+              nav("apps");
+            })}>
+              <label>Tên ứng dụng<input name="name" required maxLength={160} defaultValue={t.title} autoFocus /></label>
+              <div className="actions"><button className="primary" disabled={busy}><Plus size={17} /> Tạo ứng dụng</button><button type="button" onClick={() => setModal("")}>Hủy</button></div>
+            </form>
+          </Modal>
+        ))}
         {modal === "organization" && (
           <Modal title="Tạo tổ chức" close={() => setModal("")}>
             <form
@@ -1519,6 +1523,10 @@ function RecordModal({
   const [files, setFiles] = useState<Row[]>([]),
     [comments, setComments] = useState<Row[]>([]),
     [localError, setLocalError] = useState("");
+  const [values, setValues] = useState<Row>(() => ({
+    ...Object.fromEntries(fields.filter((f) => Object.hasOwn(f.config || {}, "default")).map((f) => [f.key, f.config.default])),
+    ...(record?.data || {}),
+  }));
   const purchaseFields = new Set(['nha_cung_cap', 'tinh_trang_mua', 'so_hoa_don', 'tong_tien_thuc_te', 'ngay_nhan', 'ghi_chu_doi_chieu']);
   const purchaseEditable = !!record && record.status === 'approved' && can('purchases.update') && canWrite;
   const editable =
@@ -1557,23 +1565,17 @@ function RecordModal({
     };
   }, [api, recordId, fetchComments, can]);
   return (
-    <Modal title={record ? record.title : "Tạo hồ sơ mới"} close={close}>
+    <Modal title={record ? record.title : `Thêm hồ sơ · ${collection.name}`} close={close}>
       {localError && <p className="error">{localError}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
           const data: Row = {};
-          for (const field of fields.filter((x) => x.can_write && (!purchaseEditable || purchaseFields.has(x.key)))) {
-            const value = f.get(field.key);
-            data[field.key] =
-              field.type === "boolean"
-                ? value === "on"
-                : value === ""
-                  ? null
-                  : field.type === "number"
-                    ? Number(value)
-                    : value;
+          for (const field of fields.filter((x) => x.can_write && !x.config?.formula && (!purchaseEditable || purchaseFields.has(x.key)))) {
+            if (!Object.hasOwn(values, field.key)) continue;
+            const value = values[field.key];
+            data[field.key] = value === "" ? null : value;
           }
           void act(async () => {
             const r = await api(
@@ -1599,54 +1601,19 @@ function RecordModal({
           />
         </label>
         {fields.map((f) => (
-          <label key={f.id}>
-            {f.label}
-            {f.required && " *"}
-            {f.type === "textarea" ? (
-              <textarea
-                name={f.key}
-                defaultValue={record?.data[f.key] || ""}
-                disabled={!f.can_write || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
-                required={f.required}
-              />
-            ) : f.type === "select" ? (
-              <select
-                name={f.key}
-                defaultValue={record?.data[f.key] || ""}
-                disabled={!f.can_write || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
-                required={f.required}
-              >
-                <option value="">Chọn giá trị</option>
-                {f.options.map((o: string) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
-            ) : f.type === "boolean" ? (
-              <input
-                name={f.key}
-                type="checkbox"
-                defaultChecked={record?.data[f.key] || false}
-                disabled={!f.can_write || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
-              />
-            ) : (
-              <input
-                name={f.key}
-                type={
-                  f.type === "number"
-                    ? "number"
-                    : f.type === "date"
-                      ? "date"
-                      : "text"
-                }
-                step={f.type === "number" ? "any" : undefined}
-                defaultValue={record?.data[f.key] ?? ""}
-                disabled={!f.can_write || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
-                required={f.required}
-              />
-            )}
-          </label>
+          <div className="record-field" key={f.id}>
+            <span className="record-field-label">{f.label}{f.required && " *"}</span>
+            <ValueInput
+              field={f}
+              api={api}
+              recordId={recordId}
+              value={values[f.key]}
+              disabled={!f.can_write || !!f.config?.formula || (!editable && !(purchaseEditable && purchaseFields.has(f.key)))}
+              change={(value) => setValues((old) => ({ ...old, [f.key]: value }))}
+            />
+            {f.config?.formula && <small className="field-help">Giá trị được tính tự động.</small>}
+            {f.type === "relation" && <small className="field-help">Chọn hồ sơ đã có trong bảng liên quan.</small>}
+          </div>
         ))}
         <div className="actions">
           {(editable || purchaseEditable) && (
