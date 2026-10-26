@@ -110,7 +110,7 @@ export default function App({ config }: { config: Config }) {
   return <Workspace config={config} />;
 }
 function Workspace({ config }: { config: Config }) {
-  const { isAuthenticated, isLoading, signIn, signOut, getAccessToken } =
+  const { isAuthenticated, isLoading, signIn, signOut, getAccessToken, getIdTokenClaims } =
     useLogto();
   const [me, setMe] = useState<Row | null>(null),
     [tenant, setTenant] = useState(
@@ -143,9 +143,36 @@ function Workspace({ config }: { config: Config }) {
   const permissionStamp = JSON.stringify(org?.permissions || []);
   const can = (permission: string) => !custom || (org?.permissions || []).includes(permission);
   const isOwner = org?.role === "owner" && !custom;
-  const viewPermissions: Record<string,string> = {dashboard:"dashboard.read",apps:"apps.read",studio:"apps.read",records:"records.read",approvals:"approvals.read",members:"members.read",audit:"audit.read",operations:"operations.read"};
+  const viewPermissions: Record<string, string> = { dashboard: "dashboard.read", apps: "apps.read", studio: "apps.read", records: "records.read", approvals: "approvals.read", members: "members.read", audit: "audit.read", operations: "operations.read" };
   const actionPending = useRef(false);
   const refresh = () => setTick((t) => t + 1);
+
+  const [accountName, setAccountName] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setAccountName("");
+
+    if (isAuthenticated) {
+      void getIdTokenClaims()
+        .then((claims) => {
+          if (!cancelled) {
+            setAccountName(
+              claims?.username || claims?.name || ""
+            );
+          }
+        })
+        .catch(() => {
+          // Giao diện dùng ID dự phòng nếu chưa lấy được tên.
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, getIdTokenClaims]);
+
   const act = async (fn: () => Promise<void>) => {
     if (actionPending.current) return;
     actionPending.current = true;
@@ -295,11 +322,11 @@ function Workspace({ config }: { config: Config }) {
   };
   const submit =
     (fn: (form: FormData) => Promise<void>) =>
-    (e: FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      const f = new FormData(e.currentTarget);
-      void act(() => fn(f));
-    };
+      (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        void act(() => fn(f));
+      };
   // Logto also sets isLoading while obtaining API tokens. Keep authenticated
   // children mounted, otherwise their mount effects fetch and unmount forever.
   if (isLoading && !isAuthenticated)
@@ -360,1009 +387,1011 @@ function Workspace({ config }: { config: Config }) {
     );
   return (
     <PermissionProvider permissions={custom ? (org?.permissions || []) : null}>
-    <div className={"shell " + (!side ? "collapsed" : "")}>
-      <aside>
-        <div className="brand">
-          <span className="brandmark">M</span>Module Workspace
-        </div>
-        <div className="workspace-label">KHÔNG GIAN HIỆN TẠI</div>
-        <select
-          className="org-select"
-          value={tenant}
-          onChange={(e) => {
-            setTenant(e.target.value);
-            sessionStorage.setItem("module-workspace.tenant", e.target.value);
-            setSelected(null);
-            setEditing(null);
-            setModal("");
-            nav("dashboard");
-          }}
-        >
-          <option value="" disabled>
-            Chọn tổ chức
-          </option>
-          {me?.organizations.map((o: Row) => (
-            <option value={o.id} key={o.id}>
-              {o.name}
+      <div className={"shell " + (!side ? "collapsed" : "")}>
+        <aside>
+          <div className="brand">
+            <span className="brandmark">M</span>Module Workspace
+          </div>
+          <div className="workspace-label">KHÔNG GIAN HIỆN TẠI</div>
+          <select
+            className="org-select"
+            value={tenant}
+            onChange={(e) => {
+              setTenant(e.target.value);
+              sessionStorage.setItem("module-workspace.tenant", e.target.value);
+              setSelected(null);
+              setEditing(null);
+              setModal("");
+              nav("dashboard");
+            }}
+          >
+            <option value="" disabled>
+              Chọn tổ chức
             </option>
-          ))}
-        </select>
-        <button
-          className="new-workspace"
-          onClick={() => setModal("organization")}
-        >
-          <Plus size={14} /> Tạo tổ chức
-        </button>
-        <nav>
-          {[
-            [LayoutDashboard, "dashboard", "Tổng quan"],
-            [Layers3, "apps", "Danh mục ứng dụng"],
-            [Settings2, "studio", "Không gian ứng dụng"],
-            [CheckCheck, "approvals", "Phê duyệt"],
-            [Users, "members", "Thành viên"],
-            [Bell, "notifications", "Thông báo"],
-            ...(isAdmin
-              ? [
+            {me?.organizations.map((o: Row) => (
+              <option value={o.id} key={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+          <button
+            className="new-workspace"
+            onClick={() => setModal("organization")}
+          >
+            <Plus size={14} /> Tạo tổ chức
+          </button>
+          <nav>
+            {[
+              [LayoutDashboard, "dashboard", "Tổng quan"],
+              [Layers3, "apps", "Danh mục ứng dụng"],
+              [Settings2, "studio", "Không gian ứng dụng"],
+              [CheckCheck, "approvals", "Phê duyệt"],
+              [Users, "members", "Thành viên"],
+              [Bell, "notifications", "Thông báo"],
+              ...(isAdmin
+                ? [
                   [ScrollText, "audit", "Nhật ký"],
                   [Activity, "operations", "Vận hành"],
                 ]
-              : []),
-            ...(isOwner ? [[Settings2, "roles", "Vai trò & quyền"]] : []),
-          ].filter(([,key]: any) => !viewPermissions[key] || can(viewPermissions[key])).map(([Icon, key, title]: any) => (
-            <button
-              key={key}
-              className={view === key ? "active" : ""}
-              onClick={() => nav(key)}
-            >
-              <Icon size={19} />
-              {title}
-              {key === "notifications" && count > 0 && (
-                <span className="nav-count">{count}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="workspace-label">BẢNG DỮ LIỆU</div>
-        <div className="collection-nav">
-          {collections.map((c) => (
-            <button
-              key={c.id}
-              className={
-                selected?.id === c.id && view === "records" ? "active" : ""
-              }
-              onClick={() => select(c)}
-            >
-              <span className="dot" />
-              {c.name}
-            </button>
-          ))}
-        </div>
-        <div className="aside-bottom">
-          <span className="avatar">{org?.name?.slice(0, 1) || "S"}</span>
-          <div>
-            <strong>{org?.role_name || roleNames[org?.role] || "Tài khoản SSO"}</strong>
-            <small title={me?.user}>{me?.user}</small>
-          </div>
-          <button
-            className="icon"
-            aria-label="Đăng xuất"
-            onClick={() => void signOut(config.origin)}
-          >
-            <LogOut size={17} />
-          </button>
-        </div>
-      </aside>
-      <main>
-        <div className="topbar">
-          <button
-            className="icon"
-            aria-label="Ẩn hiện menu"
-            onClick={() => setSide(!side)}
-          >
-            <PanelLeftClose size={19} />
-          </button>
-          <span>
-            Không gian làm việc <ChevronRight size={14} />{" "}
-            {org?.name || "Khởi tạo"}
-          </span>
-          <div className="top-actions">
-            <span className="live-dot" /> Kết nối SSO{" "}
-            <button className="icon" onClick={refresh} aria-label="Tải lại">
-              <RefreshCw size={17} />
-            </button>
-          </div>
-        </div>
-        <div className="content">
-          {view === "roles" && isOwner && <RoleManager key={tenant} api={api} changed={refresh}/>}
-          {view === "studio" && tenant && can("apps.read") && (
-            <Studio
-              key={tenant}
-              api={api}
-              role={org?.role || "viewer"}
-              user={me?.user || ""}
-            />
-          )}
-          {error && (
-            <div role="alert" className="alert error">
-              {error}
-              <button className="icon" onClick={() => setError("")}>
-                <X size={16} />
-              </button>
-            </div>
-          )}
-          {success && (
-            <div role="status" className="alert success">
-              {success}
-              <button className="icon" onClick={() => setSuccess("")}>
-                <X size={16} />
-              </button>
-            </div>
-          )}
-          {!tenant ? (
-            <div className="welcome">
-              <span className="eyebrow">BẮT ĐẦU TỪ ĐÂY</span>
-              <h1>
-                Tổ chức của bạn,
-                <br />
-                theo cách của bạn.
-              </h1>
-              <p>
-                Tạo không gian đầu tiên, xây dựng bảng dữ liệu và mời đồng đội
-                cùng làm việc.
-              </p>
+                : []),
+              ...(isOwner ? [[Settings2, "roles", "Vai trò & quyền"]] : []),
+            ].filter(([, key]: any) => !viewPermissions[key] || can(viewPermissions[key])).map(([Icon, key, title]: any) => (
               <button
-                className="primary"
-                onClick={() => setModal("organization")}
+                key={key}
+                className={view === key ? "active" : ""}
+                onClick={() => nav(key)}
               >
-                <Plus size={18} /> Tạo tổ chức đầu tiên
+                <Icon size={19} />
+                {title}
+                {key === "notifications" && count > 0 && (
+                  <span className="nav-count">{count}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+          <div className="workspace-label">BẢNG DỮ LIỆU</div>
+          <div className="collection-nav">
+            {collections.map((c) => (
+              <button
+                key={c.id}
+                className={
+                  selected?.id === c.id && view === "records" ? "active" : ""
+                }
+                onClick={() => select(c)}
+              >
+                <span className="dot" />
+                {c.name}
+              </button>
+            ))}
+          </div>
+          <div className="aside-bottom">
+            <span className="avatar">{org?.name?.slice(0, 1) || "S"}</span>
+            <div>
+              <strong>{org?.role_name || roleNames[org?.role] || "Tài khoản SSO"}</strong>
+              <small title={accountName || me?.user}>
+                {accountName || me?.user}
+              </small>
+            </div>
+            <button
+              className="icon"
+              aria-label="Đăng xuất"
+              onClick={() => void signOut(config.origin)}
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
+        </aside>
+        <main>
+          <div className="topbar">
+            <button
+              className="icon"
+              aria-label="Ẩn hiện menu"
+              onClick={() => setSide(!side)}
+            >
+              <PanelLeftClose size={19} />
+            </button>
+            <span>
+              Không gian làm việc <ChevronRight size={14} />{" "}
+              {org?.name || "Khởi tạo"}
+            </span>
+            <div className="top-actions">
+              <span className="live-dot" /> {me?.user}{" "}
+              <button className="icon" onClick={refresh} aria-label="Tải lại">
+                <RefreshCw size={17} />
               </button>
             </div>
-          ) : (
-            <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">
-                    {view === "records"
-                      ? "DỮ LIỆU & QUY TRÌNH"
-                      : "MODULE WORKSPACE / WORKSPACE"}
-                  </span>
-                  <h1>
-                    {(
-                      {
-                        dashboard: "Một góc nhìn, toàn bộ công việc.",
-                        apps: "Ứng dụng của tổ chức",
-                        approvals: "Trung tâm phê duyệt",
-                        members: "Con người & phân quyền",
-                        notifications: "Thông báo của bạn",
-                        audit: "Lịch sử hoạt động",
-                        operations: "Vận hành tự động hóa",
-                      } as Row
-                    )[view] || selected?.name}
-                  </h1>
-                  <p>
-                    {view === "dashboard"
-                      ? "Mọi thông tin cần thiết để bắt đầu một ngày làm việc hiệu quả."
-                      : view === "records"
-                        ? selected?.description
-                        : "Quản lý tập trung. Cộng tác rõ ràng. Dữ liệu có cấu trúc."}
-                  </p>
+          </div>
+          <div className="content">
+            {view === "roles" && isOwner && <RoleManager key={tenant} api={api} changed={refresh} />}
+            {view === "studio" && tenant && can("apps.read") && (
+              <Studio
+                key={tenant}
+                api={api}
+                role={org?.role || "viewer"}
+                user={me?.user || ""}
+              />
+            )}
+            {error && (
+              <div role="alert" className="alert error">
+                {error}
+                <button className="icon" onClick={() => setError("")}>
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+            {success && (
+              <div role="status" className="alert success">
+                {success}
+                <button className="icon" onClick={() => setSuccess("")}>
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+            {!tenant ? (
+              <div className="welcome">
+                <span className="eyebrow">BẮT ĐẦU TỪ ĐÂY</span>
+                <h1>
+                  Tổ chức của bạn,
+                  <br />
+                  theo cách của bạn.
+                </h1>
+                <p>
+                  Tạo không gian đầu tiên, xây dựng bảng dữ liệu và mời đồng đội
+                  cùng làm việc.
+                </p>
+                <button
+                  className="primary"
+                  onClick={() => setModal("organization")}
+                >
+                  <Plus size={18} /> Tạo tổ chức đầu tiên
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="page-heading">
+                  <div>
+                    <span className="eyebrow">
+                      {view === "records"
+                        ? "DỮ LIỆU & QUY TRÌNH"
+                        : "MODULE WORKSPACE / WORKSPACE"}
+                    </span>
+                    <h1>
+                      {(
+                        {
+                          dashboard: "Một góc nhìn, toàn bộ công việc.",
+                          apps: "Ứng dụng của tổ chức",
+                          approvals: "Trung tâm phê duyệt",
+                          members: "Con người & phân quyền",
+                          notifications: "Thông báo của bạn",
+                          audit: "Lịch sử hoạt động",
+                          operations: "Vận hành tự động hóa",
+                        } as Row
+                      )[view] || selected?.name}
+                    </h1>
+                    <p>
+                      {view === "dashboard"
+                        ? "Mọi thông tin cần thiết để bắt đầu một ngày làm việc hiệu quả."
+                        : view === "records"
+                          ? selected?.description
+                          : "Quản lý tập trung. Cộng tác rõ ràng. Dữ liệu có cấu trúc."}
+                    </p>
+                  </div>
+                  <div className="actions">
+                    {view === "apps" && isAdmin && can("apps.manage") && (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void act(async () => {
+                              const r = await api(
+                                "/api/templates/office",
+                                "POST",
+                              );
+                              select(r.collection);
+                            })
+                          }
+                        >
+                          Dùng mẫu Văn phòng số
+                        </button>
+                        <button
+                          className="primary"
+                          onClick={() => setModal("app")}
+                        >
+                          <Plus size={17} /> Tạo ứng dụng
+                        </button>
+                      </>
+                    )}
+                    {view === "records" && (
+                      <>
+                        {isAdmin && (
+                          <button onClick={() => setModal("builder")}>
+                            <Settings2 size={17} /> Thiết kế
+                          </button>
+                        )}
+                        {canWrite && (
+                          <button
+                            className="primary"
+                            onClick={() => {
+                              setEditing(null);
+                              setModal("record");
+                            }}
+                          >
+                            <Plus size={17} /> Tạo hồ sơ
+                          </button>
+                        )}
+                      </>
+                    )}
+                    {view === "members" && manageMembers && (
+                      <button
+                        className="primary"
+                        onClick={() => {
+                          setEditing(null);
+                          setModal("member");
+                        }}
+                      >
+                        <Plus size={17} /> Thêm thành viên
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="actions">
-                  {view === "apps" && isAdmin && can("apps.manage") && (
-                    <>
+                {loading && <div className="loading">Đang tải dữ liệu…</div>}
+                {!loading && view === "dashboard" && data?.statuses && (
+                  <>
+                    <div className="stats">
+                      {[
+                        ["Ứng dụng", data.apps, "apps"],
+                        ["Thành viên", data.members, "members"],
+                        [
+                          "Chờ phê duyệt",
+                          data.statuses.find((x: Row) => x.status === "pending")
+                            ?.count || 0,
+                          "approvals",
+                        ],
+                        [
+                          "Hồ sơ đã duyệt",
+                          data.statuses.find((x: Row) => x.status === "approved")
+                            ?.count || 0,
+                          "approvals",
+                        ],
+                      ].map(([title, value, key]) => (
+                        <button
+                          className="stat"
+                          key={title}
+                          onClick={() => nav(key)}
+                        >
+                          <span>
+                            {title}
+                            <ArrowUpRight size={16} />
+                          </span>
+                          <strong>{value}</strong>
+                          <small>Dữ liệu trong tổ chức hiện tại</small>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="dashboard-grid">
+                      <section className="panel">
+                        <div className="section-head">
+                          <h2>Không gian ứng dụng</h2>
+                          <button className="link" onClick={() => nav("apps")}>
+                            Xem tất cả <ArrowUpRight size={16} />
+                          </button>
+                        </div>
+                        {apps.length ? (
+                          apps.map((a) => (
+                            <button
+                              className="app-row"
+                              key={a.id}
+                              onClick={() => nav("apps")}
+                            >
+                              <span className="tile-icon">
+                                <Layers3 />
+                              </span>
+                              <span>
+                                <strong>{a.name}</strong>
+                                <small>
+                                  {a.description ||
+                                    "Ứng dụng quản lý của tổ chức"}
+                                </small>
+                              </span>
+                              <ChevronRight size={18} />
+                            </button>
+                          ))
+                        ) : (
+                          <Empty text="Chưa có ứng dụng" />
+                        )}
+                      </section>
+                      <section className="guide">
+                        <span className="eyebrow">QUY TRÌNH RÕ RÀNG</span>
+                        <h2>
+                          Đưa công việc
+                          <br />
+                          vào đúng luồng.
+                        </h2>
+                        <p>
+                          Từ một biểu mẫu đơn giản đến hồ sơ được phê duyệt, mọi
+                          bước đều có người chịu trách nhiệm.
+                        </p>
+                        <ol>
+                          <li>Tạo ứng dụng và bảng dữ liệu</li>
+                          <li>Thiết kế trường và quyền truy cập</li>
+                          <li>Bật quy trình phê duyệt</li>
+                          <li>Theo dõi kết quả tại đây</li>
+                        </ol>
+                      </section>
+                    </div>
+                  </>
+                )}
+                {!loading && view === "apps" && (
+                  <div className="app-grid">
+                    {apps.map((a) => (
+                      <section className="app-card" key={a.id}>
+                        <div className="app-card-head">
+                          <span className="tile-icon">
+                            <Layers3 />
+                          </span>
+                          <span className="subtle">
+                            {collections.filter((c) => c.app_id === a.id).length}{" "}
+                            bảng
+                          </span>
+                        </div>
+                        <h2>{a.name}</h2>
+                        <p>
+                          {a.description ||
+                            "Không gian quản lý dữ liệu và quy trình."}
+                        </p>
+                        <div className="table-links">
+                          {collections
+                            .filter((c) => c.app_id === a.id)
+                            .map((c) => (
+                              <button key={c.id} onClick={() => select(c)}>
+                                <FileText size={16} />
+                                {c.name}
+                                <ChevronRight size={16} />
+                              </button>
+                            ))}
+                        </div>
+                        {isAdmin && (
+                          <button
+                            className="text-btn"
+                            onClick={() => {
+                              setEditing(a);
+                              setModal("collection");
+                            }}
+                          >
+                            <Plus size={16} /> Thêm bảng dữ liệu
+                          </button>
+                        )}
+                      </section>
+                    ))}
+                    {!apps.length && (
+                      <Empty text="Tạo ứng dụng đầu tiên của bạn" />
+                    )}
+                  </div>
+                )}
+                {!loading && view === "records" && data?.items && (
+                  <section className="panel">
+                    <div className="table-toolbar">
+                      <label className="search">
+                        <Search size={17} />
+                        <input
+                          placeholder="Tìm theo tiêu đề…"
+                          value={search}
+                          onChange={(e) => {
+                            setSearch(e.target.value);
+                            setPage(1);
+                          }}
+                        />
+                      </label>
+                      <select
+                        value={filter}
+                        onChange={(e) => {
+                          setFilter(e.target.value);
+                          setPage(1);
+                        }}
+                      >
+                        <option value="">Tất cả trạng thái</option>
+                        {Object.entries(statusNames).map(([k, v]) => (
+                          <option key={k} value={k}>
+                            {v}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="subtle">{data.total} hồ sơ</span>
+                    </div>
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Hồ sơ</th>
+                            <th>Trạng thái</th>
+                            {fields.slice(0, 4).map((f) => (
+                              <th key={f.id}>{f.label}</th>
+                            ))}
+                            <th>Cập nhật</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.items.map((r: Row) => (
+                            <tr key={r.id}>
+                              <td>
+                                <button
+                                  className="record-title"
+                                  onClick={() => {
+                                    setEditing(r);
+                                    setModal("record");
+                                  }}
+                                >
+                                  <FileText size={16} />
+                                  {r.title}
+                                </button>
+                              </td>
+                              <td>
+                                <Badge value={r.status} />
+                              </td>
+                              {fields.slice(0, 4).map((f) => (
+                                <td key={f.id}>
+                                  {typeof r.data[f.key] === "boolean"
+                                    ? r.data[f.key]
+                                      ? "Có"
+                                      : "Không"
+                                    : String(r.data[f.key] ?? "—")}
+                                </td>
+                              ))}
+                              <td className="subtle">
+                                {new Date(r.updated_at).toLocaleDateString(
+                                  "vi-VN",
+                                )}
+                              </td>
+                              <td>
+                                <button
+                                  className="icon"
+                                  onClick={() => {
+                                    setEditing(r);
+                                    setModal("record");
+                                  }}
+                                  aria-label="Mở hồ sơ"
+                                >
+                                  <ArrowUpRight size={17} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {!data.items.length && <Empty text="Chưa có hồ sơ phù hợp" />}
+                    <div className="pagination">
+                      <button
+                        disabled={page === 1}
+                        onClick={() => setPage(page - 1)}
+                      >
+                        Trước
+                      </button>
+                      <span>Trang {page}</span>
+                      <button
+                        disabled={page * 30 >= data.total}
+                        onClick={() => setPage(page + 1)}
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </section>
+                )}
+                {!loading && view === "approvals" && Array.isArray(data) && (
+                  <section className="panel">
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Hồ sơ</th>
+                            <th>Trạng thái</th>
+                            <th>Vai trò duyệt</th>
+                            <th>Nhận xét</th>
+                            <th>Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.map((a) => (
+                            <tr key={a.id}>
+                              <td>
+                                <button
+                                  className="record-title"
+                                  onClick={() =>
+                                    void act(async () => {
+                                      const r = await api(
+                                        "/api/records/" + a.record_id,
+                                      );
+                                      const col = collections.find(
+                                        (c) => c.id === r.collection_id,
+                                      );
+                                      if (!col)
+                                        throw Error(
+                                          "Không tìm thấy bảng dữ liệu",
+                                        );
+                                      select(col);
+                                      setEditing(r);
+                                      setModal("record");
+                                    })
+                                  }
+                                >
+                                  {a.title}
+                                </button>
+                                <small>
+                                  {new Date(a.created_at).toLocaleString("vi-VN")}
+                                </small>
+                              </td>
+                              <td>
+                                <Badge value={a.status} />
+                              </td>
+                              <td>{roleNames[a.reviewer_role]}</td>
+                              <td>{a.comment || "—"}</td>
+                              <td>
+                                {a.status === "pending" &&
+                                  a.requested_by !== me?.user &&
+                                  (org.role === "owner" ||
+                                    org.role === a.reviewer_role) && (
+                                    <button
+                                      disabled={busy}
+                                      onClick={() => {
+                                        setEditing(a);
+                                        setModal("decision");
+                                      }}
+                                    >
+                                      Xử lý
+                                    </button>
+                                  )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {!data.length && <Empty text="Không có yêu cầu phê duyệt" />}
+                  </section>
+                )}
+                {!loading && view === "members" && Array.isArray(data) && (
+                  <>
+                    <div className="info">
+                      Subject của bạn: <code>{me?.user}</code>. Thành viên đăng
+                      nhập một lần rồi gửi subject này cho quản trị viên.
+                    </div>
+                    <section className="panel">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Thành viên / Subject</th>
+                            <th>Vai trò</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.map((m) => (
+                            <tr key={m.user_id}>
+                              <td>
+                                <strong>{m.display_name}</strong>
+                                {m.user_id === me?.user && (
+                                  <span className="badge">Bạn</span>
+                                )}
+                              </td>
+                              <td>{m.role_name || roleNames[m.role]}</td>
+                              <td>
+                                {manageMembers && (isOwner || !m.custom_role_id) &&
+                                  m.role !== "owner" &&
+                                  m.user_id !== me?.user && (
+                                    <div className="actions">
+                                      <button
+                                        onClick={() => {
+                                          setEditing(m);
+                                          setModal("member");
+                                        }}
+                                      >
+                                        Đổi quyền
+                                      </button>
+                                      <button
+                                        className="icon danger"
+                                        aria-label="Xóa thành viên"
+                                        disabled={busy}
+                                        onClick={() => {
+                                          if (
+                                            confirm("Gỡ thành viên khỏi tổ chức?")
+                                          )
+                                            void act(async () => {
+                                              await api(
+                                                "/api/members/" +
+                                                encodeURIComponent(m.user_id),
+                                                "DELETE",
+                                              );
+                                            });
+                                        }}
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </section>
+                  </>
+                )}
+                {!loading && view === "notifications" && Array.isArray(data) && (
+                  <section className="panel">
+                    <div className="section-head">
+                      <h2>Hoạt động mới</h2>
                       <button
                         disabled={busy}
                         onClick={() =>
                           void act(async () => {
-                            const r = await api(
-                              "/api/templates/office",
-                              "POST",
-                            );
-                            select(r.collection);
+                            await api("/api/notifications/read", "POST");
                           })
                         }
                       >
-                        Dùng mẫu Văn phòng số
+                        Đánh dấu đã đọc
                       </button>
-                      <button
-                        className="primary"
-                        onClick={() => setModal("app")}
+                    </div>
+                    {data.map((n) => (
+                      <div
+                        className={"notification " + (!n.read_at ? "unread" : "")}
+                        key={n.id}
                       >
-                        <Plus size={17} /> Tạo ứng dụng
-                      </button>
-                    </>
-                  )}
-                  {view === "records" && (
-                    <>
-                      {isAdmin && (
-                        <button onClick={() => setModal("builder")}>
-                          <Settings2 size={17} /> Thiết kế
-                        </button>
-                      )}
-                      {canWrite && (
-                        <button
-                          className="primary"
-                          onClick={() => {
-                            setEditing(null);
-                            setModal("record");
-                          }}
-                        >
-                          <Plus size={17} /> Tạo hồ sơ
-                        </button>
-                      )}
-                    </>
-                  )}
-                  {view === "members" && manageMembers && (
-                    <button
-                      className="primary"
-                      onClick={() => {
-                        setEditing(null);
-                        setModal("member");
-                      }}
-                    >
-                      <Plus size={17} /> Thêm thành viên
-                    </button>
-                  )}
-                </div>
-              </div>
-              {loading && <div className="loading">Đang tải dữ liệu…</div>}
-              {!loading && view === "dashboard" && data?.statuses && (
-                <>
-                  <div className="stats">
-                    {[
-                      ["Ứng dụng", data.apps, "apps"],
-                      ["Thành viên", data.members, "members"],
-                      [
-                        "Chờ phê duyệt",
-                        data.statuses.find((x: Row) => x.status === "pending")
-                          ?.count || 0,
-                        "approvals",
-                      ],
-                      [
-                        "Hồ sơ đã duyệt",
-                        data.statuses.find((x: Row) => x.status === "approved")
-                          ?.count || 0,
-                        "approvals",
-                      ],
-                    ].map(([title, value, key]) => (
-                      <button
-                        className="stat"
-                        key={title}
-                        onClick={() => nav(key)}
-                      >
-                        <span>
-                          {title}
-                          <ArrowUpRight size={16} />
-                        </span>
-                        <strong>{value}</strong>
-                        <small>Dữ liệu trong tổ chức hiện tại</small>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="dashboard-grid">
-                    <section className="panel">
-                      <div className="section-head">
-                        <h2>Không gian ứng dụng</h2>
-                        <button className="link" onClick={() => nav("apps")}>
-                          Xem tất cả <ArrowUpRight size={16} />
-                        </button>
-                      </div>
-                      {apps.length ? (
-                        apps.map((a) => (
-                          <button
-                            className="app-row"
-                            key={a.id}
-                            onClick={() => nav("apps")}
-                          >
-                            <span className="tile-icon">
-                              <Layers3 />
-                            </span>
-                            <span>
-                              <strong>{a.name}</strong>
-                              <small>
-                                {a.description ||
-                                  "Ứng dụng quản lý của tổ chức"}
-                              </small>
-                            </span>
-                            <ChevronRight size={18} />
-                          </button>
-                        ))
-                      ) : (
-                        <Empty text="Chưa có ứng dụng" />
-                      )}
-                    </section>
-                    <section className="guide">
-                      <span className="eyebrow">QUY TRÌNH RÕ RÀNG</span>
-                      <h2>
-                        Đưa công việc
-                        <br />
-                        vào đúng luồng.
-                      </h2>
-                      <p>
-                        Từ một biểu mẫu đơn giản đến hồ sơ được phê duyệt, mọi
-                        bước đều có người chịu trách nhiệm.
-                      </p>
-                      <ol>
-                        <li>Tạo ứng dụng và bảng dữ liệu</li>
-                        <li>Thiết kế trường và quyền truy cập</li>
-                        <li>Bật quy trình phê duyệt</li>
-                        <li>Theo dõi kết quả tại đây</li>
-                      </ol>
-                    </section>
-                  </div>
-                </>
-              )}
-              {!loading && view === "apps" && (
-                <div className="app-grid">
-                  {apps.map((a) => (
-                    <section className="app-card" key={a.id}>
-                      <div className="app-card-head">
                         <span className="tile-icon">
-                          <Layers3 />
+                          <Bell size={19} />
                         </span>
-                        <span className="subtle">
-                          {collections.filter((c) => c.app_id === a.id).length}{" "}
-                          bảng
-                        </span>
+                        <div>
+                          <strong>{n.message}</strong>
+                          <small>
+                            {new Date(n.created_at).toLocaleString("vi-VN")}
+                          </small>
+                        </div>
+                        {!n.read_at && <span className="dot" />}
                       </div>
-                      <h2>{a.name}</h2>
-                      <p>
-                        {a.description ||
-                          "Không gian quản lý dữ liệu và quy trình."}
-                      </p>
-                      <div className="table-links">
-                        {collections
-                          .filter((c) => c.app_id === a.id)
-                          .map((c) => (
-                            <button key={c.id} onClick={() => select(c)}>
-                              <FileText size={16} />
-                              {c.name}
-                              <ChevronRight size={16} />
-                            </button>
-                          ))}
-                      </div>
-                      {isAdmin && (
-                        <button
-                          className="text-btn"
-                          onClick={() => {
-                            setEditing(a);
-                            setModal("collection");
-                          }}
-                        >
-                          <Plus size={16} /> Thêm bảng dữ liệu
-                        </button>
-                      )}
-                    </section>
-                  ))}
-                  {!apps.length && (
-                    <Empty text="Tạo ứng dụng đầu tiên của bạn" />
-                  )}
-                </div>
-              )}
-              {!loading && view === "records" && data?.items && (
-                <section className="panel">
-                  <div className="table-toolbar">
-                    <label className="search">
-                      <Search size={17} />
-                      <input
-                        placeholder="Tìm theo tiêu đề…"
-                        value={search}
-                        onChange={(e) => {
-                          setSearch(e.target.value);
-                          setPage(1);
-                        }}
-                      />
-                    </label>
-                    <select
-                      value={filter}
-                      onChange={(e) => {
-                        setFilter(e.target.value);
-                        setPage(1);
-                      }}
-                    >
-                      <option value="">Tất cả trạng thái</option>
-                      {Object.entries(statusNames).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="subtle">{data.total} hồ sơ</span>
-                  </div>
-                  <div className="table-scroll">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Hồ sơ</th>
-                          <th>Trạng thái</th>
-                          {fields.slice(0, 4).map((f) => (
-                            <th key={f.id}>{f.label}</th>
-                          ))}
-                          <th>Cập nhật</th>
-                          <th />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.items.map((r: Row) => (
-                          <tr key={r.id}>
-                            <td>
-                              <button
-                                className="record-title"
-                                onClick={() => {
-                                  setEditing(r);
-                                  setModal("record");
-                                }}
-                              >
-                                <FileText size={16} />
-                                {r.title}
-                              </button>
-                            </td>
-                            <td>
-                              <Badge value={r.status} />
-                            </td>
-                            {fields.slice(0, 4).map((f) => (
-                              <td key={f.id}>
-                                {typeof r.data[f.key] === "boolean"
-                                  ? r.data[f.key]
-                                    ? "Có"
-                                    : "Không"
-                                  : String(r.data[f.key] ?? "—")}
-                              </td>
-                            ))}
-                            <td className="subtle">
-                              {new Date(r.updated_at).toLocaleDateString(
-                                "vi-VN",
-                              )}
-                            </td>
-                            <td>
-                              <button
-                                className="icon"
-                                onClick={() => {
-                                  setEditing(r);
-                                  setModal("record");
-                                }}
-                                aria-label="Mở hồ sơ"
-                              >
-                                <ArrowUpRight size={17} />
-                              </button>
-                            </td>
+                    ))}
+                    {!data.length && (
+                      <Empty text="Bạn đã cập nhật mọi thông tin" />
+                    )}
+                  </section>
+                )}
+                {!loading && view === "audit" && Array.isArray(data) && (
+                  <section className="panel">
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Thời điểm</th>
+                            <th>Thao tác</th>
+                            <th>Người thực hiện</th>
+                            <th>Đối tượng</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {!data.items.length && <Empty text="Chưa có hồ sơ phù hợp" />}
-                  <div className="pagination">
-                    <button
-                      disabled={page === 1}
-                      onClick={() => setPage(page - 1)}
-                    >
-                      Trước
-                    </button>
-                    <span>Trang {page}</span>
-                    <button
-                      disabled={page * 30 >= data.total}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      Sau
-                    </button>
-                  </div>
-                </section>
-              )}
-              {!loading && view === "approvals" && Array.isArray(data) && (
-                <section className="panel">
-                  <div className="table-scroll">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Hồ sơ</th>
-                          <th>Trạng thái</th>
-                          <th>Vai trò duyệt</th>
-                          <th>Nhận xét</th>
-                          <th>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.map((a) => (
-                          <tr key={a.id}>
-                            <td>
-                              <button
-                                className="record-title"
-                                onClick={() =>
-                                  void act(async () => {
-                                    const r = await api(
-                                      "/api/records/" + a.record_id,
-                                    );
-                                    const col = collections.find(
-                                      (c) => c.id === r.collection_id,
-                                    );
-                                    if (!col)
-                                      throw Error(
-                                        "Không tìm thấy bảng dữ liệu",
-                                      );
-                                    select(col);
-                                    setEditing(r);
-                                    setModal("record");
-                                  })
-                                }
-                              >
-                                {a.title}
-                              </button>
-                              <small>
+                        </thead>
+                        <tbody>
+                          {data.map((a) => (
+                            <tr key={a.id}>
+                              <td>
                                 {new Date(a.created_at).toLocaleString("vi-VN")}
-                              </small>
-                            </td>
-                            <td>
-                              <Badge value={a.status} />
-                            </td>
-                            <td>{roleNames[a.reviewer_role]}</td>
-                            <td>{a.comment || "—"}</td>
-                            <td>
-                              {a.status === "pending" &&
-                                a.requested_by !== me?.user &&
-                                (org.role === "owner" ||
-                                  org.role === a.reviewer_role) && (
+                              </td>
+                              <td>
+                                <code>{a.action}</code>
+                              </td>
+                              <td>{a.actor}</td>
+                              <td className="subtle">{a.entity_id}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
+                {!loading && view === "operations" && Array.isArray(data) && (
+                  <section className="panel">
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Sự kiện</th>
+                            <th>Số lần thử</th>
+                            <th>Kết quả</th>
+                            <th>Thử lại</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.map((e) => (
+                            <tr key={e.id}>
+                              <td>
+                                {e.kind}
+                                <small>
+                                  {new Date(e.created_at).toLocaleString("vi-VN")}
+                                </small>
+                              </td>
+                              <td>{e.attempts}</td>
+                              <td>
+                                {e.delivered_at ? (
+                                  <Badge value="approved" />
+                                ) : (
+                                  e.last_error || "Đang chờ"
+                                )}
+                              </td>
+                              <td>
+                                {!e.delivered_at && (
                                   <button
                                     disabled={busy}
-                                    onClick={() => {
-                                      setEditing(a);
-                                      setModal("decision");
-                                    }}
+                                    onClick={() =>
+                                      void act(async () => {
+                                        await api(
+                                          "/api/operations/" + e.id + "/retry",
+                                          "POST",
+                                        );
+                                      })
+                                    }
                                   >
-                                    Xử lý
+                                    Thử lại
                                   </button>
                                 )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {!data.length && <Empty text="Không có yêu cầu phê duyệt" />}
-                </section>
-              )}
-              {!loading && view === "members" && Array.isArray(data) && (
-                <>
-                  <div className="info">
-                    Subject của bạn: <code>{me?.user}</code>. Thành viên đăng
-                    nhập một lần rồi gửi subject này cho quản trị viên.
-                  </div>
-                  <section className="panel">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Thành viên / Subject</th>
-                          <th>Vai trò</th>
-                          <th />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.map((m) => (
-                          <tr key={m.user_id}>
-                            <td>
-                              <strong>{m.display_name}</strong>
-                              {m.user_id === me?.user && (
-                                <span className="badge">Bạn</span>
-                              )}
-                            </td>
-                            <td>{m.role_name || roleNames[m.role]}</td>
-                            <td>
-                              {manageMembers && (isOwner || !m.custom_role_id) &&
-                                m.role !== "owner" &&
-                                m.user_id !== me?.user && (
-                                  <div className="actions">
-                                    <button
-                                      onClick={() => {
-                                        setEditing(m);
-                                        setModal("member");
-                                      }}
-                                    >
-                                      Đổi quyền
-                                    </button>
-                                    <button
-                                      className="icon danger"
-                                      aria-label="Xóa thành viên"
-                                      disabled={busy}
-                                      onClick={() => {
-                                        if (
-                                          confirm("Gỡ thành viên khỏi tổ chức?")
-                                        )
-                                          void act(async () => {
-                                            await api(
-                                              "/api/members/" +
-                                                encodeURIComponent(m.user_id),
-                                              "DELETE",
-                                            );
-                                          });
-                                      }}
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </div>
-                                )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </section>
-                </>
-              )}
-              {!loading && view === "notifications" && Array.isArray(data) && (
-                <section className="panel">
-                  <div className="section-head">
-                    <h2>Hoạt động mới</h2>
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        void act(async () => {
-                          await api("/api/notifications/read", "POST");
-                        })
-                      }
-                    >
-                      Đánh dấu đã đọc
-                    </button>
-                  </div>
-                  {data.map((n) => (
-                    <div
-                      className={"notification " + (!n.read_at ? "unread" : "")}
-                      key={n.id}
-                    >
-                      <span className="tile-icon">
-                        <Bell size={19} />
-                      </span>
-                      <div>
-                        <strong>{n.message}</strong>
-                        <small>
-                          {new Date(n.created_at).toLocaleString("vi-VN")}
-                        </small>
-                      </div>
-                      {!n.read_at && <span className="dot" />}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
-                  {!data.length && (
-                    <Empty text="Bạn đã cập nhật mọi thông tin" />
-                  )}
-                </section>
-              )}
-              {!loading && view === "audit" && Array.isArray(data) && (
-                <section className="panel">
-                  <div className="table-scroll">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Thời điểm</th>
-                          <th>Thao tác</th>
-                          <th>Người thực hiện</th>
-                          <th>Đối tượng</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.map((a) => (
-                          <tr key={a.id}>
-                            <td>
-                              {new Date(a.created_at).toLocaleString("vi-VN")}
-                            </td>
-                            <td>
-                              <code>{a.action}</code>
-                            </td>
-                            <td>{a.actor}</td>
-                            <td className="subtle">{a.entity_id}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              )}
-              {!loading && view === "operations" && Array.isArray(data) && (
-                <section className="panel">
-                  <div className="table-scroll">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Sự kiện</th>
-                          <th>Số lần thử</th>
-                          <th>Kết quả</th>
-                          <th>Thử lại</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.map((e) => (
-                          <tr key={e.id}>
-                            <td>
-                              {e.kind}
-                              <small>
-                                {new Date(e.created_at).toLocaleString("vi-VN")}
-                              </small>
-                            </td>
-                            <td>{e.attempts}</td>
-                            <td>
-                              {e.delivered_at ? (
-                                <Badge value="approved" />
-                              ) : (
-                                e.last_error || "Đang chờ"
-                              )}
-                            </td>
-                            <td>
-                              {!e.delivered_at && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() =>
-                                    void act(async () => {
-                                      await api(
-                                        "/api/operations/" + e.id + "/retry",
-                                        "POST",
-                                      );
-                                    })
-                                  }
-                                >
-                                  Thử lại
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-        </div>
-        <footer className="page-footer">
-          Module Workspace <span>Không gian chung. Năng lực riêng.</span>
-        </footer>
-      </main>
-      {modal === "organization" && (
-        <Modal title="Tạo tổ chức" close={() => setModal("")}>
-          <form
-            onSubmit={submit(async (f) => {
-              const o = await api("/api/organizations", "POST", {
-                name: f.get("name"),
-              });
-              setTenant(o.id);
-              sessionStorage.setItem("module-workspace.tenant", o.id);
-              setModal("");
-              nav("dashboard");
-            })}
-          >
-            <label>
-              Tên tổ chức
-              <input
-                name="name"
-                required
-                maxLength={160}
-                placeholder="Ví dụ: Trường THPT Bình Minh"
-                autoFocus
-              />
-            </label>
-            <button className="primary" disabled={busy}>
-              Tạo không gian
-            </button>
-          </form>
-        </Modal>
-      )}
-      {modal === "app" && (
-        <Modal title="Tạo ứng dụng" close={() => setModal("")}>
-          <form
-            onSubmit={submit(async (f) => {
-              await api("/api/apps", "POST", {
-                name: f.get("name"),
-                description: f.get("description"),
-              });
-              setModal("");
-            })}
-          >
-            <label>
-              Tên ứng dụng
-              <input
-                name="name"
-                required
-                placeholder="Văn phòng số"
-                maxLength={160}
-              />
-            </label>
-            <label>
-              Mô tả
-              <textarea name="description" maxLength={2000} />
-            </label>
-            <button className="primary" disabled={busy}>
-              Tạo ứng dụng
-            </button>
-          </form>
-        </Modal>
-      )}
-      {modal === "collection" && editing && (
-        <Modal title="Thêm bảng dữ liệu" close={() => setModal("")}>
-          <form
-            onSubmit={submit(async (f) => {
-              const c = await api("/api/collections", "POST", {
-                app_id: editing.id,
-                name: f.get("name"),
-                description: f.get("description"),
-              });
-              setModal("");
-              select(c);
-            })}
-          >
-            <label>
-              Tên bảng
-              <input
-                name="name"
-                required
-                placeholder="Đề nghị mua sắm"
-                maxLength={160}
-              />
-            </label>
-            <label>
-              Mô tả
-              <textarea name="description" maxLength={2000} />
-            </label>
-            <button className="primary" disabled={busy}>
-              Tạo bảng
-            </button>
-          </form>
-        </Modal>
-      )}
-      {modal === "builder" && selected && (
-        <Modal title={"Thiết kế · " + selected.name} close={() => setModal("")}>
-          <div className="builder">
-            <h3>Quy trình phê duyệt</h3>
+                  </section>
+                )}
+              </>
+            )}
+          </div>
+          <footer className="page-footer">
+            Module Workspace <span>Không gian chung. Năng lực riêng.</span>
+          </footer>
+        </main>
+        {modal === "organization" && (
+          <Modal title="Tạo tổ chức" close={() => setModal("")}>
             <form
               onSubmit={submit(async (f) => {
-                const c = await api(
-                  "/api/collections/" + selected.id,
-                  "PATCH",
-                  {
-                    name: f.get("name"),
-                    workflow_enabled: f.get("enabled") === "on",
-                    reviewer_role: f.get("reviewer"),
-                  },
-                );
-                setSelected(c);
-                setSuccess("Đã lưu cấu hình quy trình");
+                const o = await api("/api/organizations", "POST", {
+                  name: f.get("name"),
+                });
+                setTenant(o.id);
+                sessionStorage.setItem("module-workspace.tenant", o.id);
+                setModal("");
+                nav("dashboard");
+              })}
+            >
+              <label>
+                Tên tổ chức
+                <input
+                  name="name"
+                  required
+                  maxLength={160}
+                  placeholder="Ví dụ: Trường THPT Bình Minh"
+                  autoFocus
+                />
+              </label>
+              <button className="primary" disabled={busy}>
+                Tạo không gian
+              </button>
+            </form>
+          </Modal>
+        )}
+        {modal === "app" && (
+          <Modal title="Tạo ứng dụng" close={() => setModal("")}>
+            <form
+              onSubmit={submit(async (f) => {
+                await api("/api/apps", "POST", {
+                  name: f.get("name"),
+                  description: f.get("description"),
+                });
+                setModal("");
+              })}
+            >
+              <label>
+                Tên ứng dụng
+                <input
+                  name="name"
+                  required
+                  placeholder="Văn phòng số"
+                  maxLength={160}
+                />
+              </label>
+              <label>
+                Mô tả
+                <textarea name="description" maxLength={2000} />
+              </label>
+              <button className="primary" disabled={busy}>
+                Tạo ứng dụng
+              </button>
+            </form>
+          </Modal>
+        )}
+        {modal === "collection" && editing && (
+          <Modal title="Thêm bảng dữ liệu" close={() => setModal("")}>
+            <form
+              onSubmit={submit(async (f) => {
+                const c = await api("/api/collections", "POST", {
+                  app_id: editing.id,
+                  name: f.get("name"),
+                  description: f.get("description"),
+                });
+                setModal("");
+                select(c);
               })}
             >
               <label>
                 Tên bảng
-                <input name="name" required defaultValue={selected.name} />
-              </label>
-              <label className="check">
                 <input
-                  type="checkbox"
-                  name="enabled"
-                  defaultChecked={selected.workflow_enabled}
-                />{" "}
-                Yêu cầu phê duyệt hồ sơ
+                  name="name"
+                  required
+                  placeholder="Đề nghị mua sắm"
+                  maxLength={160}
+                />
               </label>
               <label>
-                Vai trò duyệt
-                <select name="reviewer" defaultValue={selected.reviewer_role}>
-                  <option value="admin">Quản trị viên</option>
-                  <option value="editor">Biên tập viên</option>
-                </select>
+                Mô tả
+                <textarea name="description" maxLength={2000} />
               </label>
-              <button disabled={busy}>Lưu quy trình</button>
+              <button className="primary" disabled={busy}>
+                Tạo bảng
+              </button>
             </form>
-            <hr />
-            <h3>Trường dữ liệu ({fields.length})</h3>
-            {fields.map((f) => (
-              <div className="field-item" key={f.id}>
-                <strong>{f.label}</strong>
-                <code>{f.key}</code>
-                <small>
-                  {f.type}
-                  {f.required ? " · Bắt buộc" : ""}
-                </small>
-              </div>
-            ))}
-            <FieldForm
-              busy={busy}
-              save={(b) =>
-                act(async () => {
-                  await api(
-                    "/api/collections/" + selected.id + "/fields",
-                    "POST",
-                    b,
+          </Modal>
+        )}
+        {modal === "builder" && selected && (
+          <Modal title={"Thiết kế · " + selected.name} close={() => setModal("")}>
+            <div className="builder">
+              <h3>Quy trình phê duyệt</h3>
+              <form
+                onSubmit={submit(async (f) => {
+                  const c = await api(
+                    "/api/collections/" + selected.id,
+                    "PATCH",
+                    {
+                      name: f.get("name"),
+                      workflow_enabled: f.get("enabled") === "on",
+                      reviewer_role: f.get("reviewer"),
+                    },
                   );
-                  setFields(
-                    await api("/api/collections/" + selected.id + "/fields"),
-                  );
-                  setSuccess("Đã thêm trường dữ liệu");
-                })
-              }
-            />
-          </div>
-        </Modal>
-      )}
-      {modal === "member" && (
-        <Modal
-          title="Thành viên & vai trò"
-          close={() => {
-            setModal("");
-            setEditing(null);
-          }}
-        >
-          <form
-            onSubmit={submit(async (f) => {
-              const chosen=String(f.get("role"));
-              await api(
-                (isOwner ? "/api/roles/assignment/" : "/api/members/") + encodeURIComponent(String(f.get("subject"))),
-                "PUT", isOwner ? (chosen.startsWith("custom:") ? {kind:"custom",role_id:chosen.slice(7)} : {kind:"builtin",role:chosen}) : {role:chosen}
-              );
+                  setSelected(c);
+                  setSuccess("Đã lưu cấu hình quy trình");
+                })}
+              >
+                <label>
+                  Tên bảng
+                  <input name="name" required defaultValue={selected.name} />
+                </label>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    name="enabled"
+                    defaultChecked={selected.workflow_enabled}
+                  />{" "}
+                  Yêu cầu phê duyệt hồ sơ
+                </label>
+                <label>
+                  Vai trò duyệt
+                  <select name="reviewer" defaultValue={selected.reviewer_role}>
+                    <option value="admin">Quản trị viên</option>
+                    <option value="editor">Biên tập viên</option>
+                  </select>
+                </label>
+                <button disabled={busy}>Lưu quy trình</button>
+              </form>
+              <hr />
+              <h3>Trường dữ liệu ({fields.length})</h3>
+              {fields.map((f) => (
+                <div className="field-item" key={f.id}>
+                  <strong>{f.label}</strong>
+                  <code>{f.key}</code>
+                  <small>
+                    {f.type}
+                    {f.required ? " · Bắt buộc" : ""}
+                  </small>
+                </div>
+              ))}
+              <FieldForm
+                busy={busy}
+                save={(b) =>
+                  act(async () => {
+                    await api(
+                      "/api/collections/" + selected.id + "/fields",
+                      "POST",
+                      b,
+                    );
+                    setFields(
+                      await api("/api/collections/" + selected.id + "/fields"),
+                    );
+                    setSuccess("Đã thêm trường dữ liệu");
+                  })
+                }
+              />
+            </div>
+          </Modal>
+        )}
+        {modal === "member" && (
+          <Modal
+            title="Thành viên & vai trò"
+            close={() => {
               setModal("");
               setEditing(null);
-            })}
+            }}
           >
-            <label>
-              Subject trong Logto
-              <input
-                name="subject"
-                required
-                defaultValue={editing?.user_id || ""}
-                maxLength={128}
-              />
-            </label>
-            <MemberRoleSelect api={api} owner={isOwner} value={editing?.custom_role_id ? 'custom:'+editing.custom_role_id : editing?.role || 'editor'}/>
-            <button className="primary" disabled={busy}>
-              Lưu thành viên
-            </button>
-          </form>
-        </Modal>
-      )}
-      {modal === "decision" && editing && (
-        <Modal title={"Xử lý · " + editing.title} close={() => setModal("")}>
-          <form
-            onSubmit={submit(async (f) => {
-              await api("/api/approvals/" + editing.id + "/decide", "POST", {
-                decision: f.get("decision"),
-                comment: f.get("comment"),
-              });
-              setModal("");
-            })}
-          >
-            <label>
-              Kết quả
-              <select name="decision">
-                <option value="approved">Phê duyệt</option>
-                <option value="rejected">Từ chối</option>
-              </select>
-            </label>
-            <label>
-              Nhận xét
-              <textarea name="comment" maxLength={2000} />
-            </label>
-            <button className="primary" disabled={busy}>
-              Xác nhận quyết định
-            </button>
-          </form>
-        </Modal>
-      )}
-      {modal === "record" && selected && (
-        <RecordModal
-          key={tenant + ":" + (editing?.id || "new")}
-          api={api}
-          config={config}
-          getToken={() => tokenFn.current(config.resource)}
-          tenant={tenant}
-          record={editing}
-          fields={fields}
-          canWrite={
-            canWrite &&
-            (org?.role !== "editor" ||
-              !editing ||
-              editing.created_by === me?.user)
-          }
-          collection={selected}
-          busy={busy}
-          act={act}
-          close={() => setModal("")}
-          saved={(r) => setEditing(r)}
-        />
-      )}
-    </div>
+            <form
+              onSubmit={submit(async (f) => {
+                const chosen = String(f.get("role"));
+                await api(
+                  (isOwner ? "/api/roles/assignment/" : "/api/members/") + encodeURIComponent(String(f.get("subject"))),
+                  "PUT", isOwner ? (chosen.startsWith("custom:") ? { kind: "custom", role_id: chosen.slice(7) } : { kind: "builtin", role: chosen }) : { role: chosen }
+                );
+                setModal("");
+                setEditing(null);
+              })}
+            >
+              <label>
+                Subject trong Logto
+                <input
+                  name="subject"
+                  required
+                  defaultValue={editing?.user_id || ""}
+                  maxLength={128}
+                />
+              </label>
+              <MemberRoleSelect api={api} owner={isOwner} value={editing?.custom_role_id ? 'custom:' + editing.custom_role_id : editing?.role || 'editor'} />
+              <button className="primary" disabled={busy}>
+                Lưu thành viên
+              </button>
+            </form>
+          </Modal>
+        )}
+        {modal === "decision" && editing && (
+          <Modal title={"Xử lý · " + editing.title} close={() => setModal("")}>
+            <form
+              onSubmit={submit(async (f) => {
+                await api("/api/approvals/" + editing.id + "/decide", "POST", {
+                  decision: f.get("decision"),
+                  comment: f.get("comment"),
+                });
+                setModal("");
+              })}
+            >
+              <label>
+                Kết quả
+                <select name="decision">
+                  <option value="approved">Phê duyệt</option>
+                  <option value="rejected">Từ chối</option>
+                </select>
+              </label>
+              <label>
+                Nhận xét
+                <textarea name="comment" maxLength={2000} />
+              </label>
+              <button className="primary" disabled={busy}>
+                Xác nhận quyết định
+              </button>
+            </form>
+          </Modal>
+        )}
+        {modal === "record" && selected && (
+          <RecordModal
+            key={tenant + ":" + (editing?.id || "new")}
+            api={api}
+            config={config}
+            getToken={() => tokenFn.current(config.resource)}
+            tenant={tenant}
+            record={editing}
+            fields={fields}
+            canWrite={
+              canWrite &&
+              (org?.role !== "editor" ||
+                !editing ||
+                editing.created_by === me?.user)
+            }
+            collection={selected}
+            busy={busy}
+            act={act}
+            close={() => setModal("")}
+            saved={(r) => setEditing(r)}
+          />
+        )}
+      </div>
     </PermissionProvider>
   );
 }
@@ -1486,7 +1515,7 @@ function RecordModal({
   close: () => void;
   saved: (r: Row) => void;
 }) {
-  const can=useCan();
+  const can = useCan();
   const [files, setFiles] = useState<Row[]>([]),
     [comments, setComments] = useState<Row[]>([]),
     [localError, setLocalError] = useState("");
@@ -1495,7 +1524,7 @@ function RecordModal({
   const recordId = record?.id as string | undefined;
   const fetchComments = useCallback(async () => {
     if (!recordId || !can("comments.read")) return [];
-    return await api('/api/builder/records/'+recordId+'/comments') as Row[];
+    return await api('/api/builder/records/' + recordId + '/comments') as Row[];
   }, [api, recordId, can]);
   const loadComments = async () => {
     setComments(await fetchComments());
@@ -1732,7 +1761,7 @@ function RecordModal({
                 const form = e.currentTarget;
                 const f = new FormData(form);
                 void act(async () => {
-                  await api('/api/builder/records/'+record.id+'/comments','POST',{body:f.get('body')});
+                  await api('/api/builder/records/' + record.id + '/comments', 'POST', { body: f.get('body') });
                   form.reset();
                   await loadComments();
                 });

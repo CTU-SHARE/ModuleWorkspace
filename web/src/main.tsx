@@ -15,7 +15,7 @@ async function start() {
   createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <LogtoProvider
-        config={{ endpoint: config.endpoint, appId: config.appId, resources: [config.resource] }}
+        config={{ endpoint: config.endpoint, appId: config.appId, resources: [config.resource], scopes: ["profile"] }}
       >
         <App config={config} />
       </LogtoProvider>
