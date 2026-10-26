@@ -1,12 +1,12 @@
 import type { Request, Response, NextFunction } from 'express';
-import { context } from '../auth.js';
+import { getContext } from '../auth.js';
 import { collection, application, pool, fail } from './base.js';
 export function legacyAccess(q: Request, _s: Response, n: NextFunction) {
   if (q.path.startsWith('/builder') || q.path === '/me' || q.path === '/organizations') return n();
   const match = q.path.match(/^\/(collections|records|files|approvals)\/([0-9a-f-]{36})(?:\/|$)/i);
   if (!match) return n();
   void (async () => {
-    const c = await context(q.headers.authorization, q.headers['x-tenant-id']);
+    const c = await getContext(q);
     const [, kind, id] = match;
     if (kind === 'collections') {
       await collection(c, id);

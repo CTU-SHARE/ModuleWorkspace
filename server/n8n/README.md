@@ -6,7 +6,7 @@ Worker lấy sự kiện từ outbox bằng `FOR UPDATE SKIP LOCKED`, gửi even
 
 Một số thông báo WebSocket có thể lặp khi retry; `event_id` giúp xác định cùng sự kiện, và database có unique `(event_id,user_id)`. Delivery là at-least-once, không tuyên bố exactly-once.
 
-Tạo tài khoản quản trị n8n một lần qua port loopback 5678 ở maintenance mode, sau đó chạy bootstrap để import, publish và restart. End user cấu hình quy trình từ ShareBase; không cần truy cập editor n8n. Đổi dev/prod phải render config và chạy bootstrap lại để cập nhật callback URL.
+Tạo tài khoản quản trị n8n một lần qua port loopback 5678 ở maintenance mode, sau đó chạy bootstrap để import, publish và restart. End user cấu hình quy trình từ Module Workspace; không cần truy cập editor n8n. Đổi dev/prod phải render config và chạy bootstrap lại để cập nhật callback URL.
 
 n8n điều phối giao vận bất đồng bộ; trạng thái phê duyệt và kiểm tra quyền thực hiện trong transaction tại Core. Phiên bản này có một cấp duyệt, không phải BPMN designer.
 

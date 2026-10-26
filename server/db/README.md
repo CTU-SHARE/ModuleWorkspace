@@ -1,6 +1,6 @@
 # PostgreSQL
 
-Database riêng theo dịch vụ: `sharebase`, `hasura` (metadata), `logto`, `n8n`. Mỗi dịch vụ có user/mật khẩu riêng. Role ứng dụng không phải PostgreSQL superuser.
+Database riêng theo dịch vụ: `module_workspace`, `hasura` (metadata), `logto`, `n8n`. Mỗi dịch vụ có user/mật khẩu riêng. Role ứng dụng không phải PostgreSQL superuser.
 
 Migration được quản lý bằng `schema_migrations`, checksum SHA-256 và advisory lock. Không chỉnh migration đã áp dụng; thêm file SQL số thứ tự tiếp theo. `db/init.sh` chỉ chạy khi volume PostgreSQL rỗng. Thay mật khẩu trong `.env` không thay mật khẩu user đã có trong volume.
 

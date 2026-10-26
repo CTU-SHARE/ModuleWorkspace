@@ -6,3 +6,6 @@ server/core/.env
 server/generated/
 server/backups/
 *.log
+.env.upgrade*
+__pycache__/
+*.tsbuildinfo

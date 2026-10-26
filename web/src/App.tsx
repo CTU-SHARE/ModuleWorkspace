@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { useHandleSignInCallback, useLogto } from '@logto/react';
-import { Centrifuge } from 'centrifuge';
+import { RoleManager, MemberRoleSelect } from "./components/RoleManager";
+import { PermissionProvider, useCan } from "./permissions";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { useHandleSignInCallback, useLogto } from "@logto/react";
+import { Centrifuge } from "centrifuge";
 import {
   LayoutDashboard,
   Layers3,
@@ -22,28 +31,34 @@ import {
   Download,
   Trash2,
   RefreshCw,
-} from 'lucide-react';
-import { Studio } from './builder/Studio';
-import type { Config } from './main';
-import { useApi, type API } from './useApi';
+} from "lucide-react";
+import { Studio } from "./builder/Studio";
+import type { Config } from "./main";
+import { useApi, type API } from "./useApi";
 type Row = Record<string, any>;
 const statusNames: Record<string, string> = {
-  draft: 'Bản nháp',
-  pending: 'Chờ duyệt',
-  approved: 'Đã duyệt',
-  rejected: 'Từ chối',
+  draft: "Bản nháp",
+  pending: "Chờ duyệt",
+  approved: "Đã duyệt",
+  rejected: "Từ chối",
 };
 const roleNames: Record<string, string> = {
-  owner: 'Chủ sở hữu',
-  admin: 'Quản trị viên',
-  editor: 'Biên tập viên',
-  viewer: 'Chỉ đọc',
+  owner: "Chủ sở hữu",
+  admin: "Quản trị viên",
+  editor: "Biên tập viên",
+  viewer: "Chỉ đọc",
 };
 function Callback() {
-  const { isLoading, error } = useHandleSignInCallback(() => location.replace('/'));
+  const { isLoading, error } = useHandleSignInCallback(() =>
+    location.replace("/"),
+  );
   return (
     <div className="center">
-      {error ? error.message : isLoading ? 'Đang hoàn tất đăng nhập…' : 'Đang chuyển hướng…'}
+      {error
+        ? error.message
+        : isLoading
+          ? "Đang hoàn tất đăng nhập…"
+          : "Đang chuyển hướng…"}
     </div>
   );
 }
@@ -77,7 +92,9 @@ function Modal({
   );
 }
 function Badge({ value }: { value: string }) {
-  return <span className={'badge ' + value}>{statusNames[value] || value}</span>;
+  return (
+    <span className={"badge " + value}>{statusNames[value] || value}</span>
+  );
 }
 function Empty({ text }: { text: string }) {
   return (
@@ -89,28 +106,31 @@ function Empty({ text }: { text: string }) {
   );
 }
 export default function App({ config }: { config: Config }) {
-  if (location.pathname === '/callback') return <Callback />;
+  if (location.pathname === "/callback") return <Callback />;
   return <Workspace config={config} />;
 }
 function Workspace({ config }: { config: Config }) {
-  const { isAuthenticated, isLoading, signIn, signOut, getAccessToken } = useLogto();
+  const { isAuthenticated, isLoading, signIn, signOut, getAccessToken } =
+    useLogto();
   const [me, setMe] = useState<Row | null>(null),
-    [tenant, setTenant] = useState(sessionStorage.getItem('sharebase.tenant') || '');
-  const [view, setView] = useState('dashboard'),
+    [tenant, setTenant] = useState(
+      sessionStorage.getItem("module-workspace.tenant") || "",
+    );
+  const [view, setView] = useState("dashboard"),
     [apps, setApps] = useState<Row[]>([]),
     [collections, setCollections] = useState<Row[]>([]),
     [selected, setSelected] = useState<Row | null>(null);
   const [data, setData] = useState<any>(null),
     [fields, setFields] = useState<Row[]>([]),
-    [error, setError] = useState(''),
-    [success, setSuccess] = useState(''),
+    [error, setError] = useState(""),
+    [success, setSuccess] = useState(""),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(false),
     [tick, setTick] = useState(0);
-  const [modal, setModal] = useState(''),
+  const [modal, setModal] = useState(""),
     [editing, setEditing] = useState<Row | null>(null),
-    [search, setSearch] = useState(''),
-    [filter, setFilter] = useState(''),
+    [search, setSearch] = useState(""),
+    [filter, setFilter] = useState(""),
     [page, setPage] = useState(1),
     [count, setCount] = useState(0),
     [side, setSide] = useState(true);
@@ -118,13 +138,19 @@ function Workspace({ config }: { config: Config }) {
   const tokenFn = useRef(getAccessToken);
   tokenFn.current = getAccessToken;
   const api = useApi(getAccessToken, config.resource, tenant);
+  const org = me?.organizations.find((o: Row) => o.id === tenant);
+  const custom = !!org?.custom_role_id;
+  const permissionStamp = JSON.stringify(org?.permissions || []);
+  const can = (permission: string) => !custom || (org?.permissions || []).includes(permission);
+  const isOwner = org?.role === "owner" && !custom;
+  const viewPermissions: Record<string,string> = {dashboard:"dashboard.read",apps:"apps.read",studio:"apps.read",records:"records.read",approvals:"approvals.read",members:"members.read",audit:"audit.read",operations:"operations.read"};
   const actionPending = useRef(false);
   const refresh = () => setTick((t) => t + 1);
   const act = async (fn: () => Promise<void>) => {
     if (actionPending.current) return;
     actionPending.current = true;
     setBusy(true);
-    setError('');
+    setError("");
     try {
       await fn();
       refresh();
@@ -138,14 +164,14 @@ function Workspace({ config }: { config: Config }) {
   useEffect(() => {
     if (!isAuthenticated) return;
     let alive = true;
-    api('/api/me')
+    api("/api/me")
       .then((m) => {
         if (!alive) return;
         setMe(m);
         if (!m.organizations.some((o: Row) => o.id === tenant)) {
-          const next = m.organizations[0]?.id || '';
+          const next = m.organizations[0]?.id || "";
           setTenant(next);
-          sessionStorage.setItem('sharebase.tenant', next);
+          sessionStorage.setItem("module-workspace.tenant", next);
         }
       })
       .catch((e) => alive && setError(e.message));
@@ -154,9 +180,13 @@ function Workspace({ config }: { config: Config }) {
     };
   }, [isAuthenticated, api, tick]);
   useEffect(() => {
-    if (!tenant || !isAuthenticated) return;
+    if (!tenant || !isAuthenticated || !org) return;
     let active = true;
-    Promise.all([api('/api/apps'), api('/api/collections'), api('/api/notifications')])
+    Promise.all([
+      can("apps.read") ? api("/api/apps") : Promise.resolve([]),
+      can("records.read") ? api("/api/collections") : Promise.resolve([]),
+      api("/api/notifications"),
+    ])
       .then(([a, c, n]) => {
         if (active) {
           setApps(a);
@@ -170,21 +200,24 @@ function Workspace({ config }: { config: Config }) {
     return () => {
       active = false;
     };
-  }, [api, tenant, isAuthenticated, tick]);
+  }, [api, tenant, isAuthenticated, tick, !!org, custom, permissionStamp]);
   useEffect(() => {
-    if (!tenant || !isAuthenticated || view === 'studio') return;
+    if (!tenant || !isAuthenticated || !org || view === "studio" || view === "roles") return;
+    if (custom && viewPermissions[view] && !can(viewPermissions[view])) {
+      setData(null); setLoading(false); setView(can('apps.read') ? 'studio' : 'notifications'); return;
+    }
     const v = ++version.current;
     // Debounce search/navigation before issuing requests; cleanup also handles StrictMode.
     const timer = setTimeout(() => {
       setLoading(true);
-      setError('');
+      setError("");
       const route =
-        view === 'records' && selected
+        view === "records" && selected
           ? `/api/collections/${selected.id}/records?page=${page}&search=${encodeURIComponent(search)}&status=${filter}`
-          : '/api/' + view;
+          : "/api/" + view;
       Promise.all([
         api(route),
-        view === 'records' && selected
+        view === "records" && selected
           ? api(`/api/collections/${selected.id}/fields`)
           : Promise.resolve([]),
       ])
@@ -205,18 +238,32 @@ function Workspace({ config }: { config: Config }) {
       clearTimeout(timer);
       version.current++;
     };
-  }, [api, tenant, isAuthenticated, view, selected?.id, page, search, filter, tick]);
+  }, [
+    api,
+    tenant,
+    isAuthenticated,
+    view,
+    selected?.id,
+    page,
+    search,
+    filter,
+    tick,
+    !!org, custom, permissionStamp,
+  ]);
   useEffect(() => {
     if (!tenant || !isAuthenticated) return;
     let active = true;
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-    const c = new Centrifuge(config.origin.replace(/^http/, 'ws') + '/connection/websocket', {
-      getToken: async () => {
-        const r = await api('/api/realtime/token');
-        return active ? r.token : '';
+    const c = new Centrifuge(
+      config.origin.replace(/^http/, "ws") + "/connection/websocket",
+      {
+        getToken: async () => {
+          const r = await api("/api/realtime/token");
+          return active ? r.token : "";
+        },
       },
-    });
-    c.on('publication', () => {
+    );
+    c.on("publication", () => {
       if (!active || refreshTimer !== undefined) return;
       refreshTimer = setTimeout(() => {
         refreshTimer = undefined;
@@ -230,33 +277,43 @@ function Workspace({ config }: { config: Config }) {
       c.disconnect();
     };
   }, [tenant, isAuthenticated, api, config.origin]);
-  const org = me?.organizations.find((o: Row) => o.id === tenant);
-  const isAdmin = ['owner', 'admin'].includes(org?.role);
-  const canWrite = org?.role !== 'viewer';
+
+  const isAdmin = ["owner", "admin"].includes(org?.role);
+  const manageMembers = isAdmin && !custom;
+  const canWrite = org?.role !== "viewer";
   const nav = (v: string) => {
     setView(v);
     setData(null);
     setPage(1);
-    setError('');
+    setError("");
   };
   const select = (c: Row) => {
     setSelected(c);
-    setSearch('');
-    setFilter('');
-    nav('records');
+    setSearch("");
+    setFilter("");
+    nav("records");
   };
-  const submit = (fn: (form: FormData) => Promise<void>) => (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    void act(() => fn(f));
-  };
-  if (isLoading) return <div className="center">Đang kết nối ShareBase…</div>;
+  const submit =
+    (fn: (form: FormData) => Promise<void>) =>
+    (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const f = new FormData(e.currentTarget);
+      void act(() => fn(f));
+    };
+  // Logto also sets isLoading while obtaining API tokens. Keep authenticated
+  // children mounted, otherwise their mount effects fetch and unmount forever.
+  if (isLoading && !isAuthenticated)
+    return (
+      <div className="center" role="status">
+        Đang kết nối Module Workspace…
+      </div>
+    );
   if (!isAuthenticated)
     return (
       <div className="login">
         <div className="login-art">
           <div className="brand">
-            <span className="brandmark">S</span>ShareBase
+            <span className="brandmark">M</span>Module Workspace
           </div>
           <small>KHÔNG GIAN LÀM VIỆC SỐ</small>
           <h1>
@@ -266,24 +323,32 @@ function Workspace({ config }: { config: Config }) {
             <br />
             <em>Trong một nơi.</em>
           </h1>
-          <p>Thiết kế dữ liệu, cộng tác và tự động hóa công việc cho tổ chức của bạn.</p>
+          <p>
+            Thiết kế dữ liệu, cộng tác và tự động hóa công việc cho tổ chức của
+            bạn.
+          </p>
           <div className="orbit">
             <Layers3 size={100} />
           </div>
           <footer>HUMAN · PROCESS · DATA</footer>
         </div>
         <div className="login-form">
-          <span className="eyebrow">CHÀO MỪNG ĐẾN SHAREBASE</span>
+          <span className="eyebrow">CHÀO MỪNG ĐẾN MODULE WORKSPACE</span>
           <h2>
             Cùng làm việc
             <br />
             có hệ thống hơn.
           </h2>
-          <p>Đăng nhập tập trung qua Logto để truy cập các tổ chức và ứng dụng của bạn.</p>
+          <p>
+            Đăng nhập tập trung qua Logto để truy cập các tổ chức và ứng dụng
+            của bạn.
+          </p>
           <button
             className="primary"
             onClick={() =>
-              void signIn(config.origin + '/callback').catch((e) => setError(e.message))
+              void signIn(config.origin + "/callback").catch((e) =>
+                setError(e.message),
+              )
             }
           >
             Đăng nhập bằng SSO <ArrowUpRight size={18} />
@@ -294,10 +359,11 @@ function Workspace({ config }: { config: Config }) {
       </div>
     );
   return (
-    <div className={'shell ' + (!side ? 'collapsed' : '')}>
+    <PermissionProvider permissions={custom ? (org?.permissions || []) : null}>
+    <div className={"shell " + (!side ? "collapsed" : "")}>
       <aside>
         <div className="brand">
-          <span className="brandmark">S</span>ShareBase
+          <span className="brandmark">M</span>Module Workspace
         </div>
         <div className="workspace-label">KHÔNG GIAN HIỆN TẠI</div>
         <select
@@ -305,11 +371,11 @@ function Workspace({ config }: { config: Config }) {
           value={tenant}
           onChange={(e) => {
             setTenant(e.target.value);
-            sessionStorage.setItem('sharebase.tenant', e.target.value);
+            sessionStorage.setItem("module-workspace.tenant", e.target.value);
             setSelected(null);
             setEditing(null);
-            setModal('');
-            nav('dashboard');
+            setModal("");
+            nav("dashboard");
           }}
         >
           <option value="" disabled>
@@ -321,28 +387,38 @@ function Workspace({ config }: { config: Config }) {
             </option>
           ))}
         </select>
-        <button className="new-workspace" onClick={() => setModal('organization')}>
+        <button
+          className="new-workspace"
+          onClick={() => setModal("organization")}
+        >
           <Plus size={14} /> Tạo tổ chức
         </button>
         <nav>
           {[
-            [LayoutDashboard, 'dashboard', 'Tổng quan'],
-            [Layers3, 'apps', 'Ứng dụng'],
-            [Settings2, 'studio', 'Thiết kế ứng dụng'],
-            [CheckCheck, 'approvals', 'Phê duyệt'],
-            [Users, 'members', 'Thành viên'],
-            [Bell, 'notifications', 'Thông báo'],
+            [LayoutDashboard, "dashboard", "Tổng quan"],
+            [Layers3, "apps", "Danh mục ứng dụng"],
+            [Settings2, "studio", "Không gian ứng dụng"],
+            [CheckCheck, "approvals", "Phê duyệt"],
+            [Users, "members", "Thành viên"],
+            [Bell, "notifications", "Thông báo"],
             ...(isAdmin
               ? [
-                  [ScrollText, 'audit', 'Nhật ký'],
-                  [Activity, 'operations', 'Vận hành'],
+                  [ScrollText, "audit", "Nhật ký"],
+                  [Activity, "operations", "Vận hành"],
                 ]
               : []),
-          ].map(([Icon, key, title]: any) => (
-            <button key={key} className={view === key ? 'active' : ''} onClick={() => nav(key)}>
+            ...(isOwner ? [[Settings2, "roles", "Vai trò & quyền"]] : []),
+          ].filter(([,key]: any) => !viewPermissions[key] || can(viewPermissions[key])).map(([Icon, key, title]: any) => (
+            <button
+              key={key}
+              className={view === key ? "active" : ""}
+              onClick={() => nav(key)}
+            >
               <Icon size={19} />
               {title}
-              {key === 'notifications' && count > 0 && <span className="nav-count">{count}</span>}
+              {key === "notifications" && count > 0 && (
+                <span className="nav-count">{count}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -351,7 +427,9 @@ function Workspace({ config }: { config: Config }) {
           {collections.map((c) => (
             <button
               key={c.id}
-              className={selected?.id === c.id && view === 'records' ? 'active' : ''}
+              className={
+                selected?.id === c.id && view === "records" ? "active" : ""
+              }
               onClick={() => select(c)}
             >
               <span className="dot" />
@@ -360,9 +438,9 @@ function Workspace({ config }: { config: Config }) {
           ))}
         </div>
         <div className="aside-bottom">
-          <span className="avatar">{org?.name?.slice(0, 1) || 'S'}</span>
+          <span className="avatar">{org?.name?.slice(0, 1) || "S"}</span>
           <div>
-            <strong>{roleNames[org?.role] || 'Tài khoản SSO'}</strong>
+            <strong>{org?.role_name || roleNames[org?.role] || "Tài khoản SSO"}</strong>
             <small title={me?.user}>{me?.user}</small>
           </div>
           <button
@@ -376,27 +454,38 @@ function Workspace({ config }: { config: Config }) {
       </aside>
       <main>
         <div className="topbar">
-          <button className="icon" aria-label="Ẩn hiện menu" onClick={() => setSide(!side)}>
+          <button
+            className="icon"
+            aria-label="Ẩn hiện menu"
+            onClick={() => setSide(!side)}
+          >
             <PanelLeftClose size={19} />
           </button>
           <span>
-            Workspace <ChevronRight size={14} /> {org?.name || 'Khởi tạo'}
+            Không gian làm việc <ChevronRight size={14} />{" "}
+            {org?.name || "Khởi tạo"}
           </span>
           <div className="top-actions">
-            <span className="live-dot" /> Kết nối SSO{' '}
+            <span className="live-dot" /> Kết nối SSO{" "}
             <button className="icon" onClick={refresh} aria-label="Tải lại">
               <RefreshCw size={17} />
             </button>
           </div>
         </div>
         <div className="content">
-          {view === 'studio' && tenant && (
-            <Studio key={tenant} api={api} role={org?.role || 'viewer'} user={me?.user || ''} />
+          {view === "roles" && isOwner && <RoleManager key={tenant} api={api} changed={refresh}/>}
+          {view === "studio" && tenant && can("apps.read") && (
+            <Studio
+              key={tenant}
+              api={api}
+              role={org?.role || "viewer"}
+              user={me?.user || ""}
+            />
           )}
           {error && (
             <div role="alert" className="alert error">
               {error}
-              <button className="icon" onClick={() => setError('')}>
+              <button className="icon" onClick={() => setError("")}>
                 <X size={16} />
               </button>
             </div>
@@ -404,7 +493,7 @@ function Workspace({ config }: { config: Config }) {
           {success && (
             <div role="status" className="alert success">
               {success}
-              <button className="icon" onClick={() => setSuccess('')}>
+              <button className="icon" onClick={() => setSuccess("")}>
                 <X size={16} />
               </button>
             </div>
@@ -417,8 +506,14 @@ function Workspace({ config }: { config: Config }) {
                 <br />
                 theo cách của bạn.
               </h1>
-              <p>Tạo không gian đầu tiên, xây dựng bảng dữ liệu và mời đồng đội cùng làm việc.</p>
-              <button className="primary" onClick={() => setModal('organization')}>
+              <p>
+                Tạo không gian đầu tiên, xây dựng bảng dữ liệu và mời đồng đội
+                cùng làm việc.
+              </p>
+              <button
+                className="primary"
+                onClick={() => setModal("organization")}
+              >
                 <Plus size={18} /> Tạo tổ chức đầu tiên
               </button>
             </div>
@@ -427,52 +522,60 @@ function Workspace({ config }: { config: Config }) {
               <div className="page-heading">
                 <div>
                   <span className="eyebrow">
-                    {view === 'records' ? 'DỮ LIỆU & QUY TRÌNH' : 'SHAREBASE / WORKSPACE'}
+                    {view === "records"
+                      ? "DỮ LIỆU & QUY TRÌNH"
+                      : "MODULE WORKSPACE / WORKSPACE"}
                   </span>
                   <h1>
                     {(
                       {
-                        dashboard: 'Một góc nhìn, toàn bộ công việc.',
-                        apps: 'Ứng dụng của tổ chức',
-                        approvals: 'Trung tâm phê duyệt',
-                        members: 'Con người & phân quyền',
-                        notifications: 'Thông báo của bạn',
-                        audit: 'Lịch sử hoạt động',
-                        operations: 'Vận hành tự động hóa',
+                        dashboard: "Một góc nhìn, toàn bộ công việc.",
+                        apps: "Ứng dụng của tổ chức",
+                        approvals: "Trung tâm phê duyệt",
+                        members: "Con người & phân quyền",
+                        notifications: "Thông báo của bạn",
+                        audit: "Lịch sử hoạt động",
+                        operations: "Vận hành tự động hóa",
                       } as Row
                     )[view] || selected?.name}
                   </h1>
                   <p>
-                    {view === 'dashboard'
-                      ? 'Mọi thông tin cần thiết để bắt đầu một ngày làm việc hiệu quả.'
-                      : view === 'records'
+                    {view === "dashboard"
+                      ? "Mọi thông tin cần thiết để bắt đầu một ngày làm việc hiệu quả."
+                      : view === "records"
                         ? selected?.description
-                        : 'Quản lý tập trung. Cộng tác rõ ràng. Dữ liệu có cấu trúc.'}
+                        : "Quản lý tập trung. Cộng tác rõ ràng. Dữ liệu có cấu trúc."}
                   </p>
                 </div>
                 <div className="actions">
-                  {view === 'apps' && isAdmin && (
+                  {view === "apps" && isAdmin && can("apps.manage") && (
                     <>
                       <button
                         disabled={busy}
                         onClick={() =>
                           void act(async () => {
-                            const r = await api('/api/templates/office', 'POST');
+                            const r = await api(
+                              "/api/templates/office",
+                              "POST",
+                            );
                             select(r.collection);
                           })
                         }
                       >
                         Dùng mẫu Văn phòng số
                       </button>
-                      <button className="primary" onClick={() => setModal('app')}>
+                      <button
+                        className="primary"
+                        onClick={() => setModal("app")}
+                      >
                         <Plus size={17} /> Tạo ứng dụng
                       </button>
                     </>
                   )}
-                  {view === 'records' && (
+                  {view === "records" && (
                     <>
                       {isAdmin && (
-                        <button onClick={() => setModal('builder')}>
+                        <button onClick={() => setModal("builder")}>
                           <Settings2 size={17} /> Thiết kế
                         </button>
                       )}
@@ -481,7 +584,7 @@ function Workspace({ config }: { config: Config }) {
                           className="primary"
                           onClick={() => {
                             setEditing(null);
-                            setModal('record');
+                            setModal("record");
                           }}
                         >
                           <Plus size={17} /> Tạo hồ sơ
@@ -489,12 +592,12 @@ function Workspace({ config }: { config: Config }) {
                       )}
                     </>
                   )}
-                  {view === 'members' && isAdmin && (
+                  {view === "members" && manageMembers && (
                     <button
                       className="primary"
                       onClick={() => {
                         setEditing(null);
-                        setModal('member');
+                        setModal("member");
                       }}
                     >
                       <Plus size={17} /> Thêm thành viên
@@ -503,24 +606,30 @@ function Workspace({ config }: { config: Config }) {
                 </div>
               </div>
               {loading && <div className="loading">Đang tải dữ liệu…</div>}
-              {!loading && view === 'dashboard' && data?.statuses && (
+              {!loading && view === "dashboard" && data?.statuses && (
                 <>
                   <div className="stats">
                     {[
-                      ['Ứng dụng', data.apps, 'apps'],
-                      ['Thành viên', data.members, 'members'],
+                      ["Ứng dụng", data.apps, "apps"],
+                      ["Thành viên", data.members, "members"],
                       [
-                        'Chờ phê duyệt',
-                        data.statuses.find((x: Row) => x.status === 'pending')?.count || 0,
-                        'approvals',
+                        "Chờ phê duyệt",
+                        data.statuses.find((x: Row) => x.status === "pending")
+                          ?.count || 0,
+                        "approvals",
                       ],
                       [
-                        'Hồ sơ đã duyệt',
-                        data.statuses.find((x: Row) => x.status === 'approved')?.count || 0,
-                        'approvals',
+                        "Hồ sơ đã duyệt",
+                        data.statuses.find((x: Row) => x.status === "approved")
+                          ?.count || 0,
+                        "approvals",
                       ],
                     ].map(([title, value, key]) => (
-                      <button className="stat" key={title} onClick={() => nav(key)}>
+                      <button
+                        className="stat"
+                        key={title}
+                        onClick={() => nav(key)}
+                      >
                         <span>
                           {title}
                           <ArrowUpRight size={16} />
@@ -534,19 +643,26 @@ function Workspace({ config }: { config: Config }) {
                     <section className="panel">
                       <div className="section-head">
                         <h2>Không gian ứng dụng</h2>
-                        <button className="link" onClick={() => nav('apps')}>
+                        <button className="link" onClick={() => nav("apps")}>
                           Xem tất cả <ArrowUpRight size={16} />
                         </button>
                       </div>
                       {apps.length ? (
                         apps.map((a) => (
-                          <button className="app-row" key={a.id} onClick={() => nav('apps')}>
+                          <button
+                            className="app-row"
+                            key={a.id}
+                            onClick={() => nav("apps")}
+                          >
                             <span className="tile-icon">
                               <Layers3 />
                             </span>
                             <span>
                               <strong>{a.name}</strong>
-                              <small>{a.description || 'Ứng dụng quản lý của tổ chức'}</small>
+                              <small>
+                                {a.description ||
+                                  "Ứng dụng quản lý của tổ chức"}
+                              </small>
                             </span>
                             <ChevronRight size={18} />
                           </button>
@@ -563,8 +679,8 @@ function Workspace({ config }: { config: Config }) {
                         vào đúng luồng.
                       </h2>
                       <p>
-                        Từ một biểu mẫu đơn giản đến hồ sơ được phê duyệt, mọi bước đều có người
-                        chịu trách nhiệm.
+                        Từ một biểu mẫu đơn giản đến hồ sơ được phê duyệt, mọi
+                        bước đều có người chịu trách nhiệm.
                       </p>
                       <ol>
                         <li>Tạo ứng dụng và bảng dữ liệu</li>
@@ -576,7 +692,7 @@ function Workspace({ config }: { config: Config }) {
                   </div>
                 </>
               )}
-              {!loading && view === 'apps' && (
+              {!loading && view === "apps" && (
                 <div className="app-grid">
                   {apps.map((a) => (
                     <section className="app-card" key={a.id}>
@@ -585,11 +701,15 @@ function Workspace({ config }: { config: Config }) {
                           <Layers3 />
                         </span>
                         <span className="subtle">
-                          {collections.filter((c) => c.app_id === a.id).length} bảng
+                          {collections.filter((c) => c.app_id === a.id).length}{" "}
+                          bảng
                         </span>
                       </div>
                       <h2>{a.name}</h2>
-                      <p>{a.description || 'Không gian quản lý dữ liệu và quy trình.'}</p>
+                      <p>
+                        {a.description ||
+                          "Không gian quản lý dữ liệu và quy trình."}
+                      </p>
                       <div className="table-links">
                         {collections
                           .filter((c) => c.app_id === a.id)
@@ -606,7 +726,7 @@ function Workspace({ config }: { config: Config }) {
                           className="text-btn"
                           onClick={() => {
                             setEditing(a);
-                            setModal('collection');
+                            setModal("collection");
                           }}
                         >
                           <Plus size={16} /> Thêm bảng dữ liệu
@@ -614,10 +734,12 @@ function Workspace({ config }: { config: Config }) {
                       )}
                     </section>
                   ))}
-                  {!apps.length && <Empty text="Tạo ứng dụng đầu tiên của bạn" />}
+                  {!apps.length && (
+                    <Empty text="Tạo ứng dụng đầu tiên của bạn" />
+                  )}
                 </div>
               )}
-              {!loading && view === 'records' && data?.items && (
+              {!loading && view === "records" && data?.items && (
                 <section className="panel">
                   <div className="table-toolbar">
                     <label className="search">
@@ -668,7 +790,7 @@ function Workspace({ config }: { config: Config }) {
                                 className="record-title"
                                 onClick={() => {
                                   setEditing(r);
-                                  setModal('record');
+                                  setModal("record");
                                 }}
                               >
                                 <FileText size={16} />
@@ -680,22 +802,24 @@ function Workspace({ config }: { config: Config }) {
                             </td>
                             {fields.slice(0, 4).map((f) => (
                               <td key={f.id}>
-                                {typeof r.data[f.key] === 'boolean'
+                                {typeof r.data[f.key] === "boolean"
                                   ? r.data[f.key]
-                                    ? 'Có'
-                                    : 'Không'
-                                  : String(r.data[f.key] ?? '—')}
+                                    ? "Có"
+                                    : "Không"
+                                  : String(r.data[f.key] ?? "—")}
                               </td>
                             ))}
                             <td className="subtle">
-                              {new Date(r.updated_at).toLocaleDateString('vi-VN')}
+                              {new Date(r.updated_at).toLocaleDateString(
+                                "vi-VN",
+                              )}
                             </td>
                             <td>
                               <button
                                 className="icon"
                                 onClick={() => {
                                   setEditing(r);
-                                  setModal('record');
+                                  setModal("record");
                                 }}
                                 aria-label="Mở hồ sơ"
                               >
@@ -709,17 +833,23 @@ function Workspace({ config }: { config: Config }) {
                   </div>
                   {!data.items.length && <Empty text="Chưa có hồ sơ phù hợp" />}
                   <div className="pagination">
-                    <button disabled={page === 1} onClick={() => setPage(page - 1)}>
+                    <button
+                      disabled={page === 1}
+                      onClick={() => setPage(page - 1)}
+                    >
                       Trước
                     </button>
                     <span>Trang {page}</span>
-                    <button disabled={page * 30 >= data.total} onClick={() => setPage(page + 1)}>
+                    <button
+                      disabled={page * 30 >= data.total}
+                      onClick={() => setPage(page + 1)}
+                    >
                       Sau
                     </button>
                   </div>
                 </section>
               )}
-              {!loading && view === 'approvals' && Array.isArray(data) && (
+              {!loading && view === "approvals" && Array.isArray(data) && (
                 <section className="panel">
                   <div className="table-scroll">
                     <table>
@@ -740,33 +870,43 @@ function Workspace({ config }: { config: Config }) {
                                 className="record-title"
                                 onClick={() =>
                                   void act(async () => {
-                                    const r = await api('/api/records/' + a.record_id);
-                                    const col = collections.find((c) => c.id === r.collection_id);
-                                    if (!col) throw Error('Không tìm thấy bảng dữ liệu');
+                                    const r = await api(
+                                      "/api/records/" + a.record_id,
+                                    );
+                                    const col = collections.find(
+                                      (c) => c.id === r.collection_id,
+                                    );
+                                    if (!col)
+                                      throw Error(
+                                        "Không tìm thấy bảng dữ liệu",
+                                      );
                                     select(col);
                                     setEditing(r);
-                                    setModal('record');
+                                    setModal("record");
                                   })
                                 }
                               >
                                 {a.title}
                               </button>
-                              <small>{new Date(a.created_at).toLocaleString('vi-VN')}</small>
+                              <small>
+                                {new Date(a.created_at).toLocaleString("vi-VN")}
+                              </small>
                             </td>
                             <td>
                               <Badge value={a.status} />
                             </td>
                             <td>{roleNames[a.reviewer_role]}</td>
-                            <td>{a.comment || '—'}</td>
+                            <td>{a.comment || "—"}</td>
                             <td>
-                              {a.status === 'pending' &&
+                              {a.status === "pending" &&
                                 a.requested_by !== me?.user &&
-                                (org.role === 'owner' || org.role === a.reviewer_role) && (
+                                (org.role === "owner" ||
+                                  org.role === a.reviewer_role) && (
                                   <button
                                     disabled={busy}
                                     onClick={() => {
                                       setEditing(a);
-                                      setModal('decision');
+                                      setModal("decision");
                                     }}
                                   >
                                     Xử lý
@@ -781,11 +921,11 @@ function Workspace({ config }: { config: Config }) {
                   {!data.length && <Empty text="Không có yêu cầu phê duyệt" />}
                 </section>
               )}
-              {!loading && view === 'members' && Array.isArray(data) && (
+              {!loading && view === "members" && Array.isArray(data) && (
                 <>
                   <div className="info">
-                    Subject của bạn: <code>{me?.user}</code>. Thành viên đăng nhập một lần rồi gửi
-                    subject này cho quản trị viên.
+                    Subject của bạn: <code>{me?.user}</code>. Thành viên đăng
+                    nhập một lần rồi gửi subject này cho quản trị viên.
                   </div>
                   <section className="panel">
                     <table>
@@ -801,38 +941,45 @@ function Workspace({ config }: { config: Config }) {
                           <tr key={m.user_id}>
                             <td>
                               <strong>{m.display_name}</strong>
-                              {m.user_id === me?.user && <span className="badge">Bạn</span>}
-                            </td>
-                            <td>{roleNames[m.role]}</td>
-                            <td>
-                              {isAdmin && m.role !== 'owner' && m.user_id !== me?.user && (
-                                <div className="actions">
-                                  <button
-                                    onClick={() => {
-                                      setEditing(m);
-                                      setModal('member');
-                                    }}
-                                  >
-                                    Đổi quyền
-                                  </button>
-                                  <button
-                                    className="icon danger"
-                                    aria-label="Xóa thành viên"
-                                    disabled={busy}
-                                    onClick={() => {
-                                      if (confirm('Gỡ thành viên khỏi tổ chức?'))
-                                        void act(async () => {
-                                          await api(
-                                            '/api/members/' + encodeURIComponent(m.user_id),
-                                            'DELETE',
-                                          );
-                                        });
-                                    }}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
+                              {m.user_id === me?.user && (
+                                <span className="badge">Bạn</span>
                               )}
+                            </td>
+                            <td>{m.role_name || roleNames[m.role]}</td>
+                            <td>
+                              {manageMembers && (isOwner || !m.custom_role_id) &&
+                                m.role !== "owner" &&
+                                m.user_id !== me?.user && (
+                                  <div className="actions">
+                                    <button
+                                      onClick={() => {
+                                        setEditing(m);
+                                        setModal("member");
+                                      }}
+                                    >
+                                      Đổi quyền
+                                    </button>
+                                    <button
+                                      className="icon danger"
+                                      aria-label="Xóa thành viên"
+                                      disabled={busy}
+                                      onClick={() => {
+                                        if (
+                                          confirm("Gỡ thành viên khỏi tổ chức?")
+                                        )
+                                          void act(async () => {
+                                            await api(
+                                              "/api/members/" +
+                                                encodeURIComponent(m.user_id),
+                                              "DELETE",
+                                            );
+                                          });
+                                      }}
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                )}
                             </td>
                           </tr>
                         ))}
@@ -841,7 +988,7 @@ function Workspace({ config }: { config: Config }) {
                   </section>
                 </>
               )}
-              {!loading && view === 'notifications' && Array.isArray(data) && (
+              {!loading && view === "notifications" && Array.isArray(data) && (
                 <section className="panel">
                   <div className="section-head">
                     <h2>Hoạt động mới</h2>
@@ -849,7 +996,7 @@ function Workspace({ config }: { config: Config }) {
                       disabled={busy}
                       onClick={() =>
                         void act(async () => {
-                          await api('/api/notifications/read', 'POST');
+                          await api("/api/notifications/read", "POST");
                         })
                       }
                     >
@@ -857,21 +1004,28 @@ function Workspace({ config }: { config: Config }) {
                     </button>
                   </div>
                   {data.map((n) => (
-                    <div className={'notification ' + (!n.read_at ? 'unread' : '')} key={n.id}>
+                    <div
+                      className={"notification " + (!n.read_at ? "unread" : "")}
+                      key={n.id}
+                    >
                       <span className="tile-icon">
                         <Bell size={19} />
                       </span>
                       <div>
                         <strong>{n.message}</strong>
-                        <small>{new Date(n.created_at).toLocaleString('vi-VN')}</small>
+                        <small>
+                          {new Date(n.created_at).toLocaleString("vi-VN")}
+                        </small>
                       </div>
                       {!n.read_at && <span className="dot" />}
                     </div>
                   ))}
-                  {!data.length && <Empty text="Bạn đã cập nhật mọi thông tin" />}
+                  {!data.length && (
+                    <Empty text="Bạn đã cập nhật mọi thông tin" />
+                  )}
                 </section>
               )}
-              {!loading && view === 'audit' && Array.isArray(data) && (
+              {!loading && view === "audit" && Array.isArray(data) && (
                 <section className="panel">
                   <div className="table-scroll">
                     <table>
@@ -886,7 +1040,9 @@ function Workspace({ config }: { config: Config }) {
                       <tbody>
                         {data.map((a) => (
                           <tr key={a.id}>
-                            <td>{new Date(a.created_at).toLocaleString('vi-VN')}</td>
+                            <td>
+                              {new Date(a.created_at).toLocaleString("vi-VN")}
+                            </td>
                             <td>
                               <code>{a.action}</code>
                             </td>
@@ -899,7 +1055,7 @@ function Workspace({ config }: { config: Config }) {
                   </div>
                 </section>
               )}
-              {!loading && view === 'operations' && Array.isArray(data) && (
+              {!loading && view === "operations" && Array.isArray(data) && (
                 <section className="panel">
                   <div className="table-scroll">
                     <table>
@@ -916,14 +1072,16 @@ function Workspace({ config }: { config: Config }) {
                           <tr key={e.id}>
                             <td>
                               {e.kind}
-                              <small>{new Date(e.created_at).toLocaleString('vi-VN')}</small>
+                              <small>
+                                {new Date(e.created_at).toLocaleString("vi-VN")}
+                              </small>
                             </td>
                             <td>{e.attempts}</td>
                             <td>
                               {e.delivered_at ? (
                                 <Badge value="approved" />
                               ) : (
-                                e.last_error || 'Đang chờ'
+                                e.last_error || "Đang chờ"
                               )}
                             </td>
                             <td>
@@ -932,7 +1090,10 @@ function Workspace({ config }: { config: Config }) {
                                   disabled={busy}
                                   onClick={() =>
                                     void act(async () => {
-                                      await api('/api/operations/' + e.id + '/retry', 'POST');
+                                      await api(
+                                        "/api/operations/" + e.id + "/retry",
+                                        "POST",
+                                      );
                                     })
                                   }
                                 >
@@ -951,18 +1112,20 @@ function Workspace({ config }: { config: Config }) {
           )}
         </div>
         <footer className="page-footer">
-          ShareBase <span>Không gian chung. Năng lực riêng.</span>
+          Module Workspace <span>Không gian chung. Năng lực riêng.</span>
         </footer>
       </main>
-      {modal === 'organization' && (
-        <Modal title="Tạo tổ chức" close={() => setModal('')}>
+      {modal === "organization" && (
+        <Modal title="Tạo tổ chức" close={() => setModal("")}>
           <form
             onSubmit={submit(async (f) => {
-              const o = await api('/api/organizations', 'POST', { name: f.get('name') });
+              const o = await api("/api/organizations", "POST", {
+                name: f.get("name"),
+              });
               setTenant(o.id);
-              sessionStorage.setItem('sharebase.tenant', o.id);
-              setModal('');
-              nav('dashboard');
+              sessionStorage.setItem("module-workspace.tenant", o.id);
+              setModal("");
+              nav("dashboard");
             })}
           >
             <label>
@@ -981,20 +1144,25 @@ function Workspace({ config }: { config: Config }) {
           </form>
         </Modal>
       )}
-      {modal === 'app' && (
-        <Modal title="Tạo ứng dụng" close={() => setModal('')}>
+      {modal === "app" && (
+        <Modal title="Tạo ứng dụng" close={() => setModal("")}>
           <form
             onSubmit={submit(async (f) => {
-              await api('/api/apps', 'POST', {
-                name: f.get('name'),
-                description: f.get('description'),
+              await api("/api/apps", "POST", {
+                name: f.get("name"),
+                description: f.get("description"),
               });
-              setModal('');
+              setModal("");
             })}
           >
             <label>
               Tên ứng dụng
-              <input name="name" required placeholder="Văn phòng số" maxLength={160} />
+              <input
+                name="name"
+                required
+                placeholder="Văn phòng số"
+                maxLength={160}
+              />
             </label>
             <label>
               Mô tả
@@ -1006,22 +1174,27 @@ function Workspace({ config }: { config: Config }) {
           </form>
         </Modal>
       )}
-      {modal === 'collection' && editing && (
-        <Modal title="Thêm bảng dữ liệu" close={() => setModal('')}>
+      {modal === "collection" && editing && (
+        <Modal title="Thêm bảng dữ liệu" close={() => setModal("")}>
           <form
             onSubmit={submit(async (f) => {
-              const c = await api('/api/collections', 'POST', {
+              const c = await api("/api/collections", "POST", {
                 app_id: editing.id,
-                name: f.get('name'),
-                description: f.get('description'),
+                name: f.get("name"),
+                description: f.get("description"),
               });
-              setModal('');
+              setModal("");
               select(c);
             })}
           >
             <label>
               Tên bảng
-              <input name="name" required placeholder="Đề nghị mua sắm" maxLength={160} />
+              <input
+                name="name"
+                required
+                placeholder="Đề nghị mua sắm"
+                maxLength={160}
+              />
             </label>
             <label>
               Mô tả
@@ -1033,19 +1206,23 @@ function Workspace({ config }: { config: Config }) {
           </form>
         </Modal>
       )}
-      {modal === 'builder' && selected && (
-        <Modal title={'Thiết kế · ' + selected.name} close={() => setModal('')}>
+      {modal === "builder" && selected && (
+        <Modal title={"Thiết kế · " + selected.name} close={() => setModal("")}>
           <div className="builder">
             <h3>Quy trình phê duyệt</h3>
             <form
               onSubmit={submit(async (f) => {
-                const c = await api('/api/collections/' + selected.id, 'PATCH', {
-                  name: f.get('name'),
-                  workflow_enabled: f.get('enabled') === 'on',
-                  reviewer_role: f.get('reviewer'),
-                });
+                const c = await api(
+                  "/api/collections/" + selected.id,
+                  "PATCH",
+                  {
+                    name: f.get("name"),
+                    workflow_enabled: f.get("enabled") === "on",
+                    reviewer_role: f.get("reviewer"),
+                  },
+                );
                 setSelected(c);
-                setSuccess('Đã lưu cấu hình quy trình');
+                setSuccess("Đã lưu cấu hình quy trình");
               })}
             >
               <label>
@@ -1053,7 +1230,11 @@ function Workspace({ config }: { config: Config }) {
                 <input name="name" required defaultValue={selected.name} />
               </label>
               <label className="check">
-                <input type="checkbox" name="enabled" defaultChecked={selected.workflow_enabled} />{' '}
+                <input
+                  type="checkbox"
+                  name="enabled"
+                  defaultChecked={selected.workflow_enabled}
+                />{" "}
                 Yêu cầu phê duyệt hồ sơ
               </label>
               <label>
@@ -1073,7 +1254,7 @@ function Workspace({ config }: { config: Config }) {
                 <code>{f.key}</code>
                 <small>
                   {f.type}
-                  {f.required ? ' · Bắt buộc' : ''}
+                  {f.required ? " · Bắt buộc" : ""}
                 </small>
               </div>
             ))}
@@ -1081,29 +1262,37 @@ function Workspace({ config }: { config: Config }) {
               busy={busy}
               save={(b) =>
                 act(async () => {
-                  await api('/api/collections/' + selected.id + '/fields', 'POST', b);
-                  setFields(await api('/api/collections/' + selected.id + '/fields'));
-                  setSuccess('Đã thêm trường dữ liệu');
+                  await api(
+                    "/api/collections/" + selected.id + "/fields",
+                    "POST",
+                    b,
+                  );
+                  setFields(
+                    await api("/api/collections/" + selected.id + "/fields"),
+                  );
+                  setSuccess("Đã thêm trường dữ liệu");
                 })
               }
             />
           </div>
         </Modal>
       )}
-      {modal === 'member' && (
+      {modal === "member" && (
         <Modal
           title="Thành viên & vai trò"
           close={() => {
-            setModal('');
+            setModal("");
             setEditing(null);
           }}
         >
           <form
             onSubmit={submit(async (f) => {
-              await api('/api/members/' + encodeURIComponent(String(f.get('subject'))), 'PUT', {
-                role: f.get('role'),
-              });
-              setModal('');
+              const chosen=String(f.get("role"));
+              await api(
+                (isOwner ? "/api/roles/assignment/" : "/api/members/") + encodeURIComponent(String(f.get("subject"))),
+                "PUT", isOwner ? (chosen.startsWith("custom:") ? {kind:"custom",role_id:chosen.slice(7)} : {kind:"builtin",role:chosen}) : {role:chosen}
+              );
+              setModal("");
               setEditing(null);
             })}
           >
@@ -1112,35 +1301,26 @@ function Workspace({ config }: { config: Config }) {
               <input
                 name="subject"
                 required
-                defaultValue={editing?.user_id || ''}
+                defaultValue={editing?.user_id || ""}
                 maxLength={128}
               />
             </label>
-            <label>
-              Vai trò
-              <select name="role" defaultValue={editing?.role || 'editor'}>
-                {['admin', 'editor', 'viewer'].map((r) => (
-                  <option key={r} value={r}>
-                    {roleNames[r]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <MemberRoleSelect api={api} owner={isOwner} value={editing?.custom_role_id ? 'custom:'+editing.custom_role_id : editing?.role || 'editor'}/>
             <button className="primary" disabled={busy}>
               Lưu thành viên
             </button>
           </form>
         </Modal>
       )}
-      {modal === 'decision' && editing && (
-        <Modal title={'Xử lý · ' + editing.title} close={() => setModal('')}>
+      {modal === "decision" && editing && (
+        <Modal title={"Xử lý · " + editing.title} close={() => setModal("")}>
           <form
             onSubmit={submit(async (f) => {
-              await api('/api/approvals/' + editing.id + '/decide', 'POST', {
-                decision: f.get('decision'),
-                comment: f.get('comment'),
+              await api("/api/approvals/" + editing.id + "/decide", "POST", {
+                decision: f.get("decision"),
+                comment: f.get("comment"),
               });
-              setModal('');
+              setModal("");
             })}
           >
             <label>
@@ -1160,9 +1340,9 @@ function Workspace({ config }: { config: Config }) {
           </form>
         </Modal>
       )}
-      {modal === 'record' && selected && (
+      {modal === "record" && selected && (
         <RecordModal
-          key={tenant + ':' + (editing?.id || 'new')}
+          key={tenant + ":" + (editing?.id || "new")}
           api={api}
           config={config}
           getToken={() => tokenFn.current(config.resource)}
@@ -1170,20 +1350,30 @@ function Workspace({ config }: { config: Config }) {
           record={editing}
           fields={fields}
           canWrite={
-            canWrite && (org?.role !== 'editor' || !editing || editing.created_by === me?.user)
+            canWrite &&
+            (org?.role !== "editor" ||
+              !editing ||
+              editing.created_by === me?.user)
           }
           collection={selected}
           busy={busy}
           act={act}
-          close={() => setModal('')}
+          close={() => setModal("")}
           saved={(r) => setEditing(r)}
         />
       )}
     </div>
+    </PermissionProvider>
   );
 }
-function FieldForm({ save, busy }: { save: (b: Row) => Promise<void>; busy: boolean }) {
-  const [type, setType] = useState('text');
+function FieldForm({
+  save,
+  busy,
+}: {
+  save: (b: Row) => Promise<void>;
+  busy: boolean;
+}) {
+  const [type, setType] = useState("text");
   return (
     <form
       onSubmit={(e) => {
@@ -1191,16 +1381,25 @@ function FieldForm({ save, busy }: { save: (b: Row) => Promise<void>; busy: bool
         const form = e.currentTarget;
         const f = new FormData(form);
         void save({
-          key: f.get('key'),
-          label: f.get('label'),
+          key: f.get("key"),
+          label: f.get("label"),
           type,
-          required: f.get('required') === 'on',
-          options: String(f.get('options') || '')
-            .split(',')
+          required: f.get("required") === "on",
+          options: String(f.get("options") || "")
+            .split(",")
             .map((v) => v.trim())
             .filter(Boolean),
-          read_roles: ['owner', 'admin', 'editor', ...(f.get('viewer') === 'on' ? ['viewer'] : [])],
-          write_roles: ['owner', 'admin', ...(f.get('editor') === 'on' ? ['editor'] : [])],
+          read_roles: [
+            "owner",
+            "admin",
+            "editor",
+            ...(f.get("viewer") === "on" ? ["viewer"] : []),
+          ],
+          write_roles: [
+            "owner",
+            "admin",
+            ...(f.get("editor") === "on" ? ["editor"] : []),
+          ],
         });
       }}
     >
@@ -1212,19 +1411,24 @@ function FieldForm({ save, busy }: { save: (b: Row) => Promise<void>; busy: bool
         </label>
         <label>
           Mã trường
-          <input name="key" required pattern="[a-z][a-z0-9_]{0,49}" placeholder="reason" />
+          <input
+            name="key"
+            required
+            pattern="[a-z][a-z0-9_]{0,49}"
+            placeholder="reason"
+          />
         </label>
       </div>
       <label>
         Loại trường
         <select value={type} onChange={(e) => setType(e.target.value)}>
           {[
-            ['text', 'Văn bản'],
-            ['textarea', 'Văn bản nhiều dòng'],
-            ['number', 'Số'],
-            ['date', 'Ngày'],
-            ['boolean', 'Có / Không'],
-            ['select', 'Lựa chọn'],
+            ["text", "Văn bản"],
+            ["textarea", "Văn bản nhiều dòng"],
+            ["number", "Số"],
+            ["date", "Ngày"],
+            ["boolean", "Có / Không"],
+            ["select", "Lựa chọn"],
           ].map(([v, l]) => (
             <option key={v} value={v}>
               {l}
@@ -1232,7 +1436,7 @@ function FieldForm({ save, busy }: { save: (b: Row) => Promise<void>; busy: bool
           ))}
         </select>
       </label>
-      {type === 'select' && (
+      {type === "select" && (
         <label>
           Các lựa chọn, cách nhau dấu phẩy
           <input name="options" required placeholder="Thấp, Trung bình, Cao" />
@@ -1242,10 +1446,12 @@ function FieldForm({ save, busy }: { save: (b: Row) => Promise<void>; busy: bool
         <input name="required" type="checkbox" /> Bắt buộc
       </label>
       <label className="check">
-        <input name="viewer" type="checkbox" defaultChecked /> Người chỉ đọc được xem trường này
+        <input name="viewer" type="checkbox" defaultChecked /> Người chỉ đọc
+        được xem trường này
       </label>
       <label className="check">
-        <input name="editor" type="checkbox" defaultChecked /> Biên tập viên được ghi trường này
+        <input name="editor" type="checkbox" defaultChecked /> Biên tập viên
+        được ghi trường này
       </label>
       <button className="primary" disabled={busy}>
         <Plus size={16} /> Thêm trường
@@ -1280,39 +1486,28 @@ function RecordModal({
   close: () => void;
   saved: (r: Row) => void;
 }) {
+  const can=useCan();
   const [files, setFiles] = useState<Row[]>([]),
     [comments, setComments] = useState<Row[]>([]),
-    [localError, setLocalError] = useState('');
-  const editable = canWrite && (!record || ['draft', 'rejected'].includes(record.status));
+    [localError, setLocalError] = useState("");
+  const editable =
+    can(record ? "records.update" : "records.create") && canWrite && (!record || ["draft", "rejected"].includes(record.status));
   const recordId = record?.id as string | undefined;
-  const gql = useCallback(
-    async (query: string, variables: Row, readOnly = false) => {
-      const r = await api('/v1/graphql', 'POST', { query, variables }, readOnly);
-      if (r.errors) throw Error(r.errors[0].message);
-      return r.data;
-    },
-    [api],
-  );
   const fetchComments = useCallback(async () => {
-    if (!recordId) return [];
-    const d = await gql(
-      'query($id:uuid!){comments(where:{record_id:{_eq:$id}},order_by:{created_at:asc}){id author body created_at}}',
-      { id: recordId },
-      true,
-    );
-    return d.comments as Row[];
-  }, [gql, recordId]);
+    if (!recordId || !can("comments.read")) return [];
+    return await api('/api/builder/records/'+recordId+'/comments') as Row[];
+  }, [api, recordId, can]);
   const loadComments = async () => {
     setComments(await fetchComments());
   };
   useEffect(() => {
     setFiles([]);
     setComments([]);
-    setLocalError('');
+    setLocalError("");
     if (!recordId) return;
     let active = true;
     // Stable dependencies: setting files/comments cannot trigger another fetch.
-    api('/api/records/' + recordId + '/files')
+    (can("files.read") ? api("/api/records/" + recordId + "/files") : Promise.resolve([]))
       .then((f) => {
         if (active) setFiles(f);
       })
@@ -1329,9 +1524,9 @@ function RecordModal({
     return () => {
       active = false;
     };
-  }, [api, recordId, fetchComments]);
+  }, [api, recordId, fetchComments, can]);
   return (
-    <Modal title={record ? record.title : 'Tạo hồ sơ mới'} close={close}>
+    <Modal title={record ? record.title : "Tạo hồ sơ mới"} close={close}>
       {localError && <p className="error">{localError}</p>}
       <form
         onSubmit={(e) => {
@@ -1341,23 +1536,23 @@ function RecordModal({
           for (const field of fields.filter((x) => x.can_write)) {
             const value = f.get(field.key);
             data[field.key] =
-              field.type === 'boolean'
-                ? value === 'on'
-                : value === ''
+              field.type === "boolean"
+                ? value === "on"
+                : value === ""
                   ? null
-                  : field.type === 'number'
+                  : field.type === "number"
                     ? Number(value)
                     : value;
           }
           void act(async () => {
             const r = await api(
               record
-                ? '/api/records/' + record.id
-                : '/api/collections/' + collection.id + '/records',
-              record ? 'PATCH' : 'POST',
-              { title: f.get('_title'), data, version: record?.version },
+                ? "/api/records/" + record.id
+                : "/api/collections/" + collection.id + "/records",
+              record ? "PATCH" : "POST",
+              { title: f.get("_title"), data, version: record?.version },
             );
-            saved(await api('/api/records/' + r.id));
+            saved(await api("/api/records/" + r.id));
           });
         }}
       >
@@ -1368,25 +1563,25 @@ function RecordModal({
             name="_title"
             required
             maxLength={160}
-            defaultValue={record?.title || ''}
+            defaultValue={record?.title || ""}
             disabled={!editable}
           />
         </label>
         {fields.map((f) => (
           <label key={f.id}>
             {f.label}
-            {f.required && ' *'}
-            {f.type === 'textarea' ? (
+            {f.required && " *"}
+            {f.type === "textarea" ? (
               <textarea
                 name={f.key}
-                defaultValue={record?.data[f.key] || ''}
+                defaultValue={record?.data[f.key] || ""}
                 disabled={!editable || !f.can_write}
                 required={f.required}
               />
-            ) : f.type === 'select' ? (
+            ) : f.type === "select" ? (
               <select
                 name={f.key}
-                defaultValue={record?.data[f.key] || ''}
+                defaultValue={record?.data[f.key] || ""}
                 disabled={!editable || !f.can_write}
                 required={f.required}
               >
@@ -1397,7 +1592,7 @@ function RecordModal({
                   </option>
                 ))}
               </select>
-            ) : f.type === 'boolean' ? (
+            ) : f.type === "boolean" ? (
               <input
                 name={f.key}
                 type="checkbox"
@@ -1407,9 +1602,15 @@ function RecordModal({
             ) : (
               <input
                 name={f.key}
-                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                step={f.type === 'number' ? 'any' : undefined}
-                defaultValue={record?.data[f.key] ?? ''}
+                type={
+                  f.type === "number"
+                    ? "number"
+                    : f.type === "date"
+                      ? "date"
+                      : "text"
+                }
+                step={f.type === "number" ? "any" : undefined}
+                defaultValue={record?.data[f.key] ?? ""}
                 disabled={!editable || !f.can_write}
                 required={f.required}
               />
@@ -1422,29 +1623,29 @@ function RecordModal({
               Lưu hồ sơ
             </button>
           )}
-          {record && editable && collection.workflow_enabled && (
+          {record && editable && can("approvals.submit") && collection.workflow_enabled && (
             <button
               type="button"
               disabled={busy}
               onClick={() =>
                 void act(async () => {
-                  await api('/api/records/' + record.id + '/submit', 'POST');
-                  saved(await api('/api/records/' + record.id));
+                  await api("/api/records/" + record.id + "/submit", "POST");
+                  saved(await api("/api/records/" + record.id));
                 })
               }
             >
               Gửi phê duyệt
             </button>
           )}
-          {record && editable && record.status === 'draft' && (
+          {record && editable && can("records.delete") && record.status === "draft" && (
             <button
               type="button"
               className="danger"
               disabled={busy}
               onClick={() => {
-                if (confirm('Xóa hồ sơ nháp này?'))
+                if (confirm("Xóa hồ sơ nháp này?"))
                   void act(async () => {
-                    await api('/api/records/' + record.id, 'DELETE');
+                    await api("/api/records/" + record.id, "DELETE");
                     close();
                   });
               }}
@@ -1464,15 +1665,18 @@ function RecordModal({
               key={f.id}
               onClick={() =>
                 void act(async () => {
-                  const r = await fetch(config.origin + '/api/files/' + f.id + '/download', {
-                    headers: {
-                      Authorization: 'Bearer ' + (await getToken()),
-                      'X-Tenant-Id': tenant,
+                  const r = await fetch(
+                    config.origin + "/api/files/" + f.id + "/download",
+                    {
+                      headers: {
+                        Authorization: "Bearer " + (await getToken()),
+                        "X-Tenant-Id": tenant,
+                      },
                     },
-                  });
-                  if (!r.ok) throw Error('Không tải được tệp');
+                  );
+                  if (!r.ok) throw Error("Không tải được tệp");
                   const u = URL.createObjectURL(await r.blob());
-                  const a = document.createElement('a');
+                  const a = document.createElement("a");
                   a.href = u;
                   a.download = f.name;
                   a.click();
@@ -1487,7 +1691,7 @@ function RecordModal({
             </button>
           ))}
           {!files.length && <p className="subtle">Chưa có tệp đính kèm.</p>}
-          {editable && (
+          {editable && can("files.upload") && (
             <label className="upload">
               <Upload size={17} /> Thêm PDF, ảnh hoặc TXT · tối đa 10 MB
               <input
@@ -1498,12 +1702,16 @@ function RecordModal({
                   const file = e.target.files?.[0];
                   if (!file) return;
                   const form = new FormData();
-                  form.append('file', file);
+                  form.append("file", file);
                   void act(async () => {
-                    await api('/api/records/' + record.id + '/files', 'POST', form);
-                    setFiles(await api('/api/records/' + record.id + '/files'));
+                    await api(
+                      "/api/records/" + record.id + "/files",
+                      "POST",
+                      form,
+                    );
+                    setFiles(await api("/api/records/" + record.id + "/files"));
                   });
-                  e.target.value = '';
+                  e.target.value = "";
                 }}
               />
             </label>
@@ -1514,26 +1722,28 @@ function RecordModal({
             <div className="comment" key={c.id}>
               <strong>{c.author}</strong>
               <p>{c.body}</p>
-              <small>{new Date(c.created_at).toLocaleString('vi-VN')}</small>
+              <small>{new Date(c.created_at).toLocaleString("vi-VN")}</small>
             </div>
           ))}
-          {canWrite && (
+          {canWrite && can("comments.create") && (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 const form = e.currentTarget;
                 const f = new FormData(form);
                 void act(async () => {
-                  await gql(
-                    'mutation($id:uuid!,$body:String!){insert_comments_one(object:{record_id:$id,body:$body}){id}}',
-                    { id: record.id, body: f.get('body') },
-                  );
+                  await api('/api/builder/records/'+record.id+'/comments','POST',{body:f.get('body')});
                   form.reset();
                   await loadComments();
                 });
               }}
             >
-              <textarea name="body" required maxLength={2000} placeholder="Viết trao đổi…" />
+              <textarea
+                name="body"
+                required
+                maxLength={2000}
+                placeholder="Viết trao đổi…"
+              />
               <button disabled={busy}>Gửi trao đổi</button>
             </form>
           )}

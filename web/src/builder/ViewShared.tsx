@@ -1,3 +1,4 @@
+import { useCan } from '../permissions';
 import { useEffect, useState } from 'react';
 import { useLoad } from './hooks';
 import { AsyncForm } from '../components/AsyncForm';
@@ -45,7 +46,8 @@ export function ViewConfig(
     `/api/builder/collections/${p.collection!.id}/fields`,
     p.collection!.version,
   );
-  if (!p.admin) return null;
+  const can=useCan();
+  if (!p.admin || !can("collections.manage")) return null;
   return (
     <details>
       <summary>Cấu hình {p.view}</summary>

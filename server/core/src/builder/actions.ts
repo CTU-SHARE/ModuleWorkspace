@@ -1,3 +1,4 @@
+import { requirePermission } from '../auth.js';
 import { z } from 'zod';
 import {
   builder,
@@ -44,17 +45,6 @@ builder.post(
         await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
           c.tenant + ':' + c.user + ':' + b.request_id,
         ]);
-        const receipt = (
-          await db.query(
-            'SELECT * FROM action_receipts WHERE tenant_id=$1 AND user_id=$2 AND request_id=$3',
-            [c.tenant, c.user, b.request_id],
-          )
-        ).rows[0];
-        if (receipt) {
-          if (receipt.record_id !== rid || receipt.action_id !== aid)
-            fail(409, 'Request ID đã dùng cho thao tác khác');
-          return receipt.result;
-        }
         const r = (
           await db.query('SELECT * FROM records WHERE tenant_id=$1 AND id=$2 FOR UPDATE', [
             c.tenant,
@@ -68,6 +58,18 @@ builder.post(
         if (!action) fail(404, 'Không tìm thấy hành động');
         if (!action.roles.includes(c.role as any) || c.role === 'viewer')
           fail(403, 'Không có quyền thực hiện');
+        requirePermission(c, action.kind === 'complete' ? 'records.complete' : 'approvals.decide');
+        const receipt = (
+          await db.query(
+            'SELECT * FROM action_receipts WHERE tenant_id=$1 AND user_id=$2 AND request_id=$3',
+            [c.tenant, c.user, b.request_id],
+          )
+        ).rows[0];
+        if (receipt) {
+          if (receipt.record_id !== rid || receipt.action_id !== aid)
+            fail(409, 'Request ID đã dùng cho thao tác khác');
+          return receipt.result;
+        }
         if (r.version !== b.version) fail(409, 'Hồ sơ đã thay đổi');
         let status: string;
         if (action.kind === 'complete') {

@@ -1,3 +1,4 @@
+import { useCan } from '../permissions';
 import { useState, useRef } from 'react';
 import { collectionPanels, type PanelProps, type Row } from './registry';
 import { pageViews } from './Pages';
@@ -5,6 +6,7 @@ import { ViewConfig, useView, ViewDetail } from './ViewShared';
 import { dateKey, addDays } from './Calendar';
 import { AsyncForm } from '../components/AsyncForm';
 function Gantt(p: PanelProps) {
+  const can = useCan();
   const [start, setStart] = useState(dateKey(new Date())),
     [span, setSpan] = useState(30),
     [error, setError] = useState('');
@@ -18,7 +20,7 @@ function Gantt(p: PanelProps) {
     day = (date: string) => (new Date(date + 'T00:00:00Z').getTime() - origin.getTime()) / 86400000;
   const rows = v.data?.items || [];
   const canEdit = (r: Row) =>
-    p.role !== 'viewer' &&
+    can('records.update') && p.role !== 'viewer' &&
     ['draft', 'rejected'].includes(r.status) &&
     (p.admin || r.created_by === p.user) &&
     [config?.start, config?.end, config?.progress]

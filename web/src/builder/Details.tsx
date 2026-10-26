@@ -1,3 +1,4 @@
+import { useCan } from '../permissions';
 import { LazyPanel } from './LazyPanel';
 import { pageViews } from './Pages';
 import { collectionPanels, type PanelProps } from './registry';
@@ -18,6 +19,7 @@ export function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function Detail(p: RecordProps) {
+  const can = useCan();
   const [edit, setEdit] = useState(false),
     [tick, setTick] = useState(0),
     [page, setPage] = useState(1),
@@ -26,12 +28,12 @@ export function Detail(p: RecordProps) {
   const loaded = useLoad(p.api, `/api/builder/records/${id}`, tick);
   const files = useLoad(
     p.api,
-    p.app.config?.modules?.files === false ? null : `/api/records/${id}/files`,
+    !can("files.read") || p.app.config?.modules?.files === false ? null : `/api/records/${id}/files`,
     tick,
   );
   const comments = useLoad(
     p.api,
-    p.app.config?.modules?.comments === false
+    !can("comments.read") || p.app.config?.modules?.comments === false
       ? null
       : `/api/builder/records/${id}/comments?page=${page}`,
     tick,
@@ -95,7 +97,7 @@ export function Detail(p: RecordProps) {
                 {displayValue(r.data[f.key])}
               </p>
             ))}
-          {p.role !== 'viewer' && <button onClick={() => setEdit(true)}>Chỉnh sửa</button>}
+          {can('records.update') && p.role !== 'viewer' && <button onClick={() => setEdit(true)}>Chỉnh sửa</button>}
           {detailActions.map((Action, i) => (
             <Action
               key={i}
@@ -107,7 +109,7 @@ export function Detail(p: RecordProps) {
               }}
             />
           ))}
-          {p.app.config?.modules?.files !== false && (
+          {can("files.read") && p.app.config?.modules?.files !== false && (
             <>
               <h4>Tệp đính kèm</h4>
               {files.data?.map((f: Row) => (
@@ -125,7 +127,7 @@ export function Detail(p: RecordProps) {
                   {f.name}
                 </button>
               ))}
-              {p.role !== 'viewer' &&
+              {can('files.upload') && p.role !== 'viewer' &&
                 ['draft', 'rejected'].includes(r.status) &&
                 (p.admin || r.created_by === p.user) && (
                   <AsyncForm
@@ -143,7 +145,7 @@ export function Detail(p: RecordProps) {
                 )}
             </>
           )}
-          {p.app.config?.modules?.comments !== false && (
+          {can("comments.read") && p.app.config?.modules?.comments !== false && (
             <>
               <h4>Trao đổi</h4>
               {comments.data?.map((x: Row) => (
@@ -162,7 +164,7 @@ export function Detail(p: RecordProps) {
               >
                 Sau
               </button>
-              {p.role !== 'viewer' && (
+              {can('comments.create') && p.role !== 'viewer' && (
                 <AsyncForm
                   submit={async (f) => {
                     await p.api(`/api/builder/records/${id}/comments`, 'POST', {

@@ -136,7 +136,7 @@ function school() {
     };
   });
   return {
-    format: 'sharebase.app',
+    format: 'module-workspace.app',
     version: 1,
     app: {
       name: 'Quản lý trường học',
@@ -177,7 +177,7 @@ function office() {
     { workflow_enabled: true, reviewer_role: 'admin' },
   );
   return {
-    format: 'sharebase.app',
+    format: 'module-workspace.app',
     version: 1,
     app: { name: 'Văn phòng', description: 'Đơn nghỉ phép và phê duyệt', icon: 'Briefcase' },
     collections: [requests],

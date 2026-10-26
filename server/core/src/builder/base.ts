@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import type pg from 'pg';
 import { z } from 'zod';
-import { context, admin, fail, type Context } from '../auth.js';
+import { getContext, admin, fail, type Context } from '../auth.js';
 import { pool } from '../db.js';
 
 export const builder = Router();
@@ -14,7 +14,7 @@ export type Row = Record<string, any>;
 export const route =
   (fn: (q: Request, s: Response, c: Context) => Promise<unknown>) =>
   (q: Request, s: Response, n: NextFunction) => {
-    context(q.headers.authorization, q.headers['x-tenant-id'])
+    getContext(q)
       .then((c) => fn(q, s, c))
       .catch(n);
   };

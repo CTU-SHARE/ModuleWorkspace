@@ -1,3 +1,5 @@
+import { roleGuard } from './role-guard.js';
+import { organizationRoles } from './organization-roles.js';
 import './builder/dashboard.js';
 import './builder/gantt.js';
 import './builder/calendar.js';
@@ -42,6 +44,7 @@ import { pool, tx, audit, event } from './db.js';
 import {
   identity,
   context,
+  getContext,
   admin,
   writer,
   internal,
@@ -82,8 +85,10 @@ const run =
   (q: Request, s: Response, n: NextFunction) => {
     Promise.resolve(fn(q, s)).catch(n);
   };
-const ctx = (q: Request) => context(q.headers.authorization, q.headers['x-tenant-id']);
+const ctx = getContext;
 const id = (q: Request, key = 'id') => uuid.parse(q.params[key]);
+app.use('/api', roleGuard);
+app.use('/api/roles', organizationRoles);
 app.use('/api/builder', builder);
 app.use('/api', legacyAccess);
 app.get(
@@ -107,6 +112,7 @@ app.post(
       Object.entries(q.body.headers || {}).map(([k, v]) => [k.toLowerCase(), v]),
     );
     const c = await context(h.authorization, h['x-tenant-id']);
+    if (c.customRole) fail(403, 'Role tùy chỉnh sử dụng REST API; GraphQL không hỗ trợ policy này');
     s.json({
       'X-Hasura-Role': 'member',
       'X-Hasura-User-Id': c.user,
@@ -132,7 +138,7 @@ app.get(
       user,
     ]);
     const r = await pool.query(
-      'SELECT o.*,m.role FROM organizations o JOIN memberships m ON m.tenant_id=o.id WHERE m.user_id=$1 ORDER BY o.created_at',
+      'SELECT o.*,coalesce(r.base_role,m.role) AS role,m.custom_role_id,r.name AS role_name,r.permissions FROM organizations o JOIN memberships m ON m.tenant_id=o.id LEFT JOIN organization_roles r ON r.tenant_id=m.tenant_id AND r.id=m.custom_role_id WHERE m.user_id=$1 ORDER BY o.created_at',
       [user],
     );
     s.json({ user, organizations: r.rows });
@@ -150,7 +156,7 @@ app.post(
       const org = (
         await c.query('INSERT INTO organizations(name) VALUES($1) RETURNING *', [b.name])
       ).rows[0];
-      await c.query("INSERT INTO memberships VALUES($1,$2,'owner')", [org.id, user]);
+      await c.query("INSERT INTO memberships(tenant_id,user_id,role) VALUES($1,$2,'owner')", [org.id, user]);
       await audit(c, org.id, user, 'organization.create', org.id);
       return org;
     });
@@ -164,7 +170,7 @@ app.get(
     s.json(
       (
         await pool.query(
-          'SELECT m.user_id,m.role,u.display_name FROM memberships m JOIN users u ON u.id=m.user_id WHERE tenant_id=$1 ORDER BY u.display_name',
+          'SELECT m.user_id,m.role,m.custom_role_id,r.name AS role_name,u.display_name FROM memberships m JOIN users u ON u.id=m.user_id LEFT JOIN organization_roles r ON r.tenant_id=m.tenant_id AND r.id=m.custom_role_id WHERE m.tenant_id=$1 ORDER BY u.display_name',
           [c.tenant],
         )
       ).rows,
@@ -181,19 +187,20 @@ app.put(
     await tx(async (db) => {
       await db.query('SELECT id FROM organizations WHERE id=$1 FOR UPDATE', [c.tenant]);
       const old = (
-        await db.query('SELECT role FROM memberships WHERE tenant_id=$1 AND user_id=$2', [
+        await db.query('SELECT role,custom_role_id FROM memberships WHERE tenant_id=$1 AND user_id=$2', [
           c.tenant,
           subject,
         ])
       ).rows[0];
+      if (old?.custom_role_id && c.role !== 'owner') fail(403,'Chỉ owner quản lý thành viên có role tùy chỉnh');
       if (old?.role === 'owner' || subject === c.user)
         fail(403, 'Không thay đổi vai trò chủ sở hữu hoặc chính mình');
       if (c.role !== 'owner' && (old?.role === 'admin' || b.role === 'admin'))
         fail(403, 'Chỉ chủ sở hữu quản lý quản trị viên');
       const u = await db.query('SELECT id FROM users WHERE id=$1', [subject]);
-      if (!u.rowCount) fail(400, 'Người dùng cần đăng nhập ShareBase một lần trước');
+      if (!u.rowCount) fail(400, 'Người dùng cần đăng nhập Module Workspace một lần trước');
       await db.query(
-        'INSERT INTO memberships(tenant_id,user_id,role) VALUES($1,$2,$3) ON CONFLICT(tenant_id,user_id) DO UPDATE SET role=excluded.role',
+        'INSERT INTO memberships(tenant_id,user_id,role) VALUES($1,$2,$3) ON CONFLICT(tenant_id,user_id) DO UPDATE SET role=excluded.role,custom_role_id=NULL',
         [c.tenant, subject, b.role],
       );
       await audit(db, c.tenant, c.user, 'member.save', subject, { role: b.role });
@@ -209,12 +216,13 @@ app.delete(
     await tx(async (db) => {
       await db.query('SELECT id FROM organizations WHERE id=$1 FOR UPDATE', [c.tenant]);
       const old = (
-        await db.query('SELECT role FROM memberships WHERE tenant_id=$1 AND user_id=$2', [
+        await db.query('SELECT role,custom_role_id FROM memberships WHERE tenant_id=$1 AND user_id=$2', [
           c.tenant,
           q.params.subject,
         ])
       ).rows[0];
       if (!old) fail(404, 'Không tìm thấy thành viên');
+      if (old.custom_role_id && c.role !== 'owner') fail(403,'Chỉ owner quản lý thành viên có role tùy chỉnh');
       if (
         old.role === 'owner' ||
         q.params.subject === c.user ||
@@ -903,7 +911,7 @@ app.use((e: any, _q: Request, s: Response, _n: NextFunction) => {
   });
 });
 const server = app.listen(env.PORT, '0.0.0.0', () =>
-  console.log('ShareBase Core listening on', env.PORT),
+  console.log('Module Workspace Core listening on', env.PORT),
 );
 for (const sig of ['SIGTERM', 'SIGINT'])
   process.on(sig, () => server.close(() => void pool.end().then(() => process.exit(0))));

@@ -1,8 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Layers3, School, Briefcase, Users, Folder, Calendar } from 'lucide-react';
-import type { API } from '../useApi';
-import { useLoad } from './hooks';
-import type { Row } from './registry';
+import { useEffect, useState } from "react";
+import {
+  Layers3,
+  School,
+  Briefcase,
+  Users,
+  Folder,
+  Calendar,
+  ArrowUpRight,
+  Search,
+} from "lucide-react";
+import type { API } from "../useApi";
+import { useLoad } from "./hooks";
+import type { Row } from "./registry";
 const icons: Record<string, typeof Layers3> = {
   Layers3,
   School,
@@ -20,8 +29,8 @@ export function AppList({
   tick: number;
   select: (a: Row) => void;
 }) {
-  const [search, setSearch] = useState(''),
-    [query, setQuery] = useState(''),
+  const [search, setSearch] = useState(""),
+    [query, setQuery] = useState(""),
     [page, setPage] = useState(1);
   useEffect(() => {
     const t = setTimeout(() => {
@@ -36,33 +45,80 @@ export function AppList({
     tick,
   );
   return (
-    <div>
-      <label>
-        Tìm ứng dụng
-        <input value={search} onChange={(e) => setSearch(e.target.value)} />
+    <div className="app-library">
+      <label className="app-search">
+        <span>
+          <Search size={15} /> Tìm ứng dụng
+        </span>
+        <input
+          placeholder="Tìm theo tên ứng dụng…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </label>
-      {error && <p role="alert">{error}</p>}
-      {loading && <p>Đang tải…</p>}
+      {error && (
+        <p className="alert error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && (
+        <div className="loading-state" role="status">
+          Đang tải ứng dụng…
+        </div>
+      )}
       <div className="app-grid">
         {data?.items.map((a: Row) => {
           const Icon = icons[a.icon] || Layers3;
           return (
-            <button key={a.id} onClick={() => select(a)}>
-              <Icon />
+            <button
+              className="application-card"
+              key={a.id}
+              onClick={() => select(a)}
+            >
+              <span className="application-icon">
+                <Icon size={24} />
+              </span>
               <strong>{a.name}</strong>
-              <p>{a.description}</p>
+              <p>
+                {a.description ||
+                  "Không gian dữ liệu và quy trình của đội ngũ."}
+              </p>
+              <span className="application-open">
+                Mở ứng dụng <ArrowUpRight size={16} />
+              </span>
             </button>
           );
         })}
       </div>
-      {data?.total === 0 && <p>Chưa có ứng dụng phù hợp.</p>}
-      <button disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-        Trước
-      </button>{' '}
-      Trang {page}{' '}
-      <button disabled={!data || page * 30 >= data.total} onClick={() => setPage((p) => p + 1)}>
-        Sau
-      </button>
+      {data?.total === 0 && (
+        <div className="collection-empty">
+          <Layers3 size={30} />
+          <h3>
+            {query
+              ? "Không tìm thấy ứng dụng"
+              : "Không gian đang chờ ý tưởng của bạn"}
+          </h3>
+          <p>
+            {query
+              ? "Thử tìm với một tên khác."
+              : "Quản trị viên có thể tạo ứng dụng mới hoặc cài từ mẫu."}
+          </p>
+        </div>
+      )}
+      <div className="pagination">
+        <button disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+          Trước
+        </button>{" "}
+        <span>
+          Trang {page} · {data?.total || 0} ứng dụng
+        </span>{" "}
+        <button
+          disabled={!data || page * 30 >= data.total}
+          onClick={() => setPage((p) => p + 1)}
+        >
+          Sau
+        </button>
+      </div>
     </div>
   );
 }

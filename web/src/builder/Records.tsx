@@ -1,3 +1,4 @@
+import { useCan } from '../permissions';
 import { useEffect, useState, type ComponentType } from 'react';
 import { useLoad } from './hooks';
 import { Filters, type Filter } from './Filters';
@@ -19,6 +20,7 @@ export const recordTools: {
   component: ComponentType<PanelProps & { query: Row }>;
 }[] = [];
 export function Records(p: PanelProps) {
+  const can = useCan();
   const col = p.collection!;
   const [search, setSearch] = useState(''),
     [term, setTerm] = useState(''),
@@ -99,7 +101,7 @@ export function Records(p: PanelProps) {
           <option value="asc">Tăng dần</option>
           <option value="desc">Giảm dần</option>
         </select>
-        {Editor && p.role !== 'viewer' && (
+        {Editor && can('records.create') && p.role !== 'viewer' && (
           <button onClick={() => setSelected(null)}>Thêm hồ sơ</button>
         )}
       </div>
@@ -116,7 +118,7 @@ export function Records(p: PanelProps) {
           setPage(1);
         }}
       />
-      {p.admin && (
+      {p.admin && can("collections.manage") && (
         <details>
           <summary>Cột hiển thị</summary>
           <AsyncForm

@@ -1,6 +1,6 @@
 {
-  "id": "ShareBaseNotify1",
-  "name": "ShareBase · Durable event notifications",
+  "id": "ModuleWorkspaceNotify1",
+  "name": "Module Workspace · Durable event notifications",
   "active": false,
   "nodes": [
     {
@@ -9,7 +9,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [0, 0],
-      "webhookId": "sharebase-events",
+      "webhookId": "module-workspace-events",
       "parameters": {
         "httpMethod": "POST",
         "path": "__WORKFLOW_PATH__",

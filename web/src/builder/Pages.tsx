@@ -1,9 +1,11 @@
+import { useCan } from '../permissions';
 import { useState } from 'react';
 import { AsyncForm } from '../components/AsyncForm';
 import { useLoad } from './hooks';
 import { appPanels, collectionPanels, type PanelProps, type Row } from './registry';
 export const pageViews = ['records'];
 export function Pages(p: PanelProps) {
+  const can = useCan();
   const [tick, setTick] = useState(0),
     [id, setId] = useState('');
   const pages = useLoad(p.api, `/api/builder/apps/${p.app.id}/pages`, tick);
@@ -12,7 +14,7 @@ export function Pages(p: PanelProps) {
   return (
     <div>
       {(pages.error || cols.error) && <p>{pages.error || cols.error}</p>}
-      {p.admin && (
+      {p.admin && can("pages.manage") && (
         <AsyncForm
           submit={async (f) => {
             const r = await p.api(
@@ -46,7 +48,7 @@ export function Pages(p: PanelProps) {
       </select>
       {page && (
         <>
-          {p.admin && (
+          {p.admin && can("pages.manage") && (
             <PageDesigner
               key={page.id + ':' + page.version}
               {...p}
@@ -70,12 +72,13 @@ export function Pages(p: PanelProps) {
   );
 }
 export function PageBlocks(p: PanelProps & { config: Row; collections: Row[] }) {
+  const can = useCan();
   return (
     <>
       {p.config.blocks?.map((b: Row) => {
         const col = p.collections.find((c) => c.id === b.collection_id);
         const View = collectionPanels.find((x) => x.id === b.view && !x.adminOnly)?.component;
-        return col && View ? (
+        return col && View && can(b.view === "form" ? "records.create" : "records.read") ? (
           <section key={b.id}>
             <h3>{b.title}</h3>
             <View {...p} collection={col} />

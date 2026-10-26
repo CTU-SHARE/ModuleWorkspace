@@ -1,6 +1,6 @@
-name: sharebase
+name: module-workspace
 x-core-env: &core-env
-  DATABASE_URL: postgres://sharebase:${CORE_DB_PASSWORD}@db:5432/sharebase
+  DATABASE_URL: postgres://${CORE_DB_USER:-module_workspace}:${CORE_DB_PASSWORD}@db:5432/${CORE_DB_NAME:-module_workspace}
   LOGTO_ISSUER: ${AUTH_ORIGIN}/oidc
   LOGTO_JWKS_URL: http://logto:3001/oidc/jwks
   LOGTO_RESOURCE: ${LOGTO_RESOURCE}
@@ -12,7 +12,7 @@ x-core-env: &core-env
   S3_ENDPOINT: http://minio:9000
   S3_ACCESS_KEY: ${MINIO_ROOT_USER}
   S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-  S3_BUCKET: sharebase
+  S3_BUCKET: ${S3_BUCKET:-module-workspace}
   HASURA_URL: http://hasura:8080
   HASURA_ADMIN_SECRET: ${HASURA_ADMIN_SECRET}
   MIGRATIONS_DIR: /migrations
@@ -24,6 +24,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       CORE_DB_PASSWORD: ${CORE_DB_PASSWORD}
+      CORE_DB_USER: ${CORE_DB_USER:-module_workspace}
+      CORE_DB_NAME: ${CORE_DB_NAME:-module_workspace}
       HASURA_DB_PASSWORD: ${HASURA_DB_PASSWORD}
       LOGTO_DB_PASSWORD: ${LOGTO_DB_PASSWORD}
       N8N_DB_PASSWORD: ${N8N_DB_PASSWORD}
@@ -86,7 +88,7 @@ services:
     image: hasura/graphql-engine:v2.48.0
     environment:
       HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://hasura:${HASURA_DB_PASSWORD}@db:5432/hasura
-      HASURA_DATA_DATABASE_URL: postgres://hasura:${HASURA_DB_PASSWORD}@db:5432/sharebase
+      HASURA_DATA_DATABASE_URL: postgres://hasura:${HASURA_DB_PASSWORD}@db:5432/${CORE_DB_NAME:-module_workspace}
       HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET}
       HASURA_GRAPHQL_ENABLE_CONSOLE: 'false'
       HASURA_GRAPHQL_DEV_MODE: 'false'
@@ -113,6 +115,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-module-workspace}
       MINIO_BROWSER: 'off'
     volumes: [minio-data:/data]
     networks: [internal]
@@ -123,6 +126,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-module-workspace}
     volumes: [./minio/init.sh:/init.sh:ro]
     networks: [internal]
     depends_on: [minio]
@@ -182,5 +186,8 @@ networks:
   edge: {}
 volumes:
   db-data:
+    name: ${DB_VOLUME_NAME:-module-workspace_db-data}
   minio-data:
+    name: ${MINIO_VOLUME_NAME:-module-workspace_minio-data}
   n8n-data:
+    name: ${N8N_VOLUME_NAME:-module-workspace_n8n-data}

@@ -1,4 +1,4 @@
-# Hợp đồng dữ liệu ShareBase
+# Hợp đồng dữ liệu Module Workspace
 
 ## Cấu trúc
 

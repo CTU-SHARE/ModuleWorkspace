@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {createApi} from '../src/lib/api';
+let tokens=0,requests=0;
+globalThis.fetch=async()=>{requests++;await new Promise(r=>setTimeout(r,10));return new Response(JSON.stringify({ok:true}),{headers:{'Content-Type':'application/json'}});};
+const api=createApi(async()=>{tokens++;await new Promise(r=>setTimeout(r,20));return 'token';},'tenant');
+const controller=new AbortController();controller.abort();
+await assert.rejects(api('/api/apps','GET',undefined,false,{signal:controller.signal}),{name:'AbortError'});
+assert.equal(tokens,0);assert.equal(requests,0);
+await Promise.all([api('/api/apps'),api('/api/apps'),api('/api/collections')]);
+assert.equal(tokens,1,'Concurrent calls acquire token once');assert.equal(requests,2,'Identical concurrent GETs deduplicate');
+const later=new AbortController();const pending=api('/api/aborted','GET',undefined,false,{signal:later.signal});later.abort();
+await assert.rejects(pending,{name:'AbortError'});assert.equal(requests,2,'Cancelled token wait never sends fetch');
+console.log('PASS: aborted requests, token single-flight, GET deduplication');

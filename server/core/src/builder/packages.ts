@@ -9,7 +9,7 @@ import { appConfigChecks } from './app-settings.js';
 import { collectionConfigChecks, collectionAsyncChecks } from './configuration.js';
 import { pageConfig, checkPage } from './pages.js';
 export const packageSchema = z.object({
-  format: z.literal('sharebase.app'),
+  format: z.literal('module-workspace.app'),
   version: z.literal(1),
   app: appInput.extend({ config: z.record(z.unknown()).default({}) }),
   collections: z
@@ -84,7 +84,7 @@ export async function exportPackage(c: Context, id: string) {
     draft_config: { roles: ['owner', 'admin', 'editor', 'viewer'], blocks: [], ...p.draft_config },
   }));
   return packageSchema.parse({
-    format: 'sharebase.app',
+    format: 'module-workspace.app',
     version: 1,
     app: { ...pick(a, ['name', 'description', 'icon']), config: pick(a.config, appKeys) },
     collections,
@@ -252,7 +252,7 @@ builder.get(
   '/apps/:id/export',
   route(async (q, s, c) => {
     const result = await exportPackage(c, identifier.parse(q.params.id));
-    s.setHeader('Content-Disposition', 'attachment; filename="sharebase-app.json"');
+    s.setHeader('Content-Disposition', 'attachment; filename="module-workspace-app.json"');
     s.json(result);
   }),
 );

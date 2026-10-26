@@ -1,13 +1,15 @@
+import { useCan } from '../permissions';
 import { useState } from 'react';
 import { detailActions } from './Details';
 import { AsyncForm } from '../components/AsyncForm';
 import { collectionPanels, type PanelProps, type Row } from './registry';
 import type { RecordProps } from './Records';
 function Actions(p: RecordProps) {
+  const can = useCan();
   return (
     <>
       {(p.collection!.config.actions || [])
-        .filter((a: Row) => a.roles.includes(p.role))
+        .filter((a: Row) => a.roles.includes(p.role) && can(a.kind === "complete" ? "records.complete" : "approvals.decide"))
         .map((a: Row) => (
           <AsyncForm
             key={a.id}
@@ -28,7 +30,7 @@ function Actions(p: RecordProps) {
             <button>{a.label}</button>
           </AsyncForm>
         ))}
-      {p.collection!.workflow_enabled &&
+      {can("approvals.submit") && p.collection!.workflow_enabled &&
         p.role !== 'viewer' &&
         ['draft', 'rejected'].includes(p.record!.status) && (
           <AsyncForm

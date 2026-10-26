@@ -1,3 +1,4 @@
+import { useCan } from '../permissions';
 import { useState } from 'react';
 import { collectionPanels, type PanelProps, type Row } from './registry';
 import { pageViews } from './Pages';
@@ -6,6 +7,7 @@ import { RecordForm } from './Forms';
 export const dateKey = (d: Date) => d.toISOString().slice(0, 10);
 export const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86400000);
 function Calendar(p: PanelProps) {
+  const can = useCan();
   const [anchor, setAnchor] = useState(dateKey(new Date())),
     [mode, setMode] = useState('month'),
     [create, setCreate] = useState<string | null>(null);
@@ -90,7 +92,7 @@ function Calendar(p: PanelProps) {
                 <strong>
                   {day.slice(8)}/{day.slice(5, 7)}
                 </strong>
-                {p.role !== 'viewer' && (
+                {can('records.update') && p.role !== 'viewer' && (
                   <button aria-label={'Thêm ngày ' + day} onClick={() => setCreate(day)}>
                     ＋
                   </button>

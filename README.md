@@ -158,7 +158,7 @@ Sau khi các dịch vụ sẵn sàng:
 
 1. Mở `http://localhost:3002`, tạo quản trị viên Logto.
 2. Tạo ứng dụng **Single-page app / React**. Redirect URI `http://localhost:8080/callback`; post sign-out URI `http://localhost:8080`.
-3. Tạo API resource với identifier `https://api.sharebase.local`. Bật username/password đăng nhập và đăng ký trong Sign-in experience.
+3. Tạo API resource với identifier `https://api.module-workspace.local`. Bật username/password đăng nhập và đăng ký trong Sign-in experience.
 4. Điền application ID vào `LOGTO_APP_ID` trong `server/.env`.
 5. Mở `http://localhost:5678`, tạo tài khoản owner n8n; không cần tạo workflow thủ công.
 6. Từ `server`, hoàn tất cấu hình:
@@ -244,7 +244,7 @@ Không chạy `docker compose down -v` nếu muốn giữ dữ liệu. Dùng cù
 | Logto Console | http://localhost:3002 | Cần bật `compose.admin.yaml` |
 | n8n | http://localhost:5678 | Cần bật `compose.admin.yaml` |
 
-Identifier `https://api.sharebase.local` trong cấu hình Logto là định danh API, không phải địa chỉ web cần truy cập. Giá trị này phải khớp với cấu hình resource của frontend và backend.
+Identifier `https://api.module-workspace.local` trong cấu hình Logto là định danh API, không phải địa chỉ web cần truy cập. Giá trị này phải khớp với cấu hình resource của frontend và backend.
 
 
 ## Sử dụng mẫu Văn phòng số

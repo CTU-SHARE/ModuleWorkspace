@@ -1,9 +1,11 @@
+import { useCan } from '../permissions';
 import { useState } from 'react';
 import { recordTools } from './Records';
 import { AsyncForm } from '../components/AsyncForm';
 import { download } from './Details';
 import type { PanelProps, Row } from './registry';
 function Transfer(p: PanelProps & { query: Row }) {
+  const can = useCan();
   const [preview, setPreview] = useState<Row | null>(null),
     [mapping, setMapping] = useState<Row>({}),
     [request, setRequest] = useState(''),
@@ -12,7 +14,7 @@ function Transfer(p: PanelProps & { query: Row }) {
   const base = `/api/builder/collections/${p.collection!.id}`;
   return (
     <div>
-      <AsyncForm
+      {can("data.export") && <AsyncForm
         submit={async (f) =>
           download(
             await p.api(
@@ -37,8 +39,8 @@ function Transfer(p: PanelProps & { query: Row }) {
           <option>xlsx</option>
         </select>
         <button>Xuất theo bộ lọc (tối đa 5000 hồ sơ)</button>
-      </AsyncForm>
-      {p.role !== 'viewer' && (
+      </AsyncForm>}
+      {can('data.import') && p.role !== 'viewer' && (
         <>
           <AsyncForm
             submit={async (f) => {

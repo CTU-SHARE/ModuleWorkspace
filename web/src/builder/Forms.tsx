@@ -1,3 +1,4 @@
+import { useCan } from '../permissions';
 import { ApiError } from '../lib/api';
 import { pageViews } from './Pages';
 import { useState, type ComponentType } from 'react';
@@ -16,6 +17,7 @@ export const formPlugins: ComponentType<{
   record: Row | null;
 }>[] = [];
 export function RecordForm(p: RecordProps) {
+  const can = useCan();
   const [values, setValues] = useState<Row>(() => ({
     ...(p.record
       ? {}
@@ -27,7 +29,7 @@ export function RecordForm(p: RecordProps) {
     ...(p.record?.data || p.initialValues || {}),
   }));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
-  const editable =
+  const editable = can(p.record ? 'records.update' : 'records.create') &&
     p.role !== 'viewer' &&
     (!p.record ||
       (['draft', 'rejected'].includes(p.record.status) &&

@@ -1,8 +1,10 @@
+import { useCan } from '../permissions';
 import { useState } from 'react';
 import { collectionPanels, type PanelProps, type Row } from './registry';
 import { pageViews } from './Pages';
 import { ViewConfig, useView, ViewDetail } from './ViewShared';
 function Kanban(p: PanelProps) {
+  const can = useCan();
   const v = useView(p, 'kanban'),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
@@ -10,7 +12,7 @@ function Kanban(p: PanelProps) {
     field = v.data?.fields.find((f: Row) => f.key === key);
   const options = ['', ...(field?.options || [])];
   const canMove = (r: Row) =>
-    p.role !== 'viewer' &&
+    can('records.update') && p.role !== 'viewer' &&
     field?.can_write &&
     ['draft', 'rejected'].includes(r.status) &&
     (p.admin || r.created_by === p.user);
